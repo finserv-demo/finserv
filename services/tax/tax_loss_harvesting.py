@@ -4,11 +4,9 @@ Identifies holdings with unrealised losses that could be sold to offset gains,
 while respecting the UK bed-and-breakfasting rule.
 """
 
-from datetime import date, timedelta
 from typing import Optional
 
 from services.tax.constants import BED_AND_BREAKFAST_DAYS, CGT_ANNUAL_EXEMPT_AMOUNT
-from services.tax.cgt import check_bed_and_breakfast
 
 
 def identify_harvesting_opportunities(

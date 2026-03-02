@@ -1,13 +1,13 @@
 """Tests for risk questionnaire and scoring."""
 
-import pytest
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from services.risk_engine.questionnaire import (
-    get_questionnaire,
     calculate_risk_score,
+    get_questionnaire,
     get_recommended_allocation,
 )
 
