@@ -40,7 +40,6 @@ class TestCalculatePortfolioValue:
         assert vwrl["current_price"] == 82.30
         assert vwrl["value"] == 150.0 * 82.30
 
-    @pytest.mark.xfail(reason="BUG: gain_loss uses wrong sign convention (issue #5)")
     def test_gain_loss_calculation(self):
         result = calculate_portfolio_value("pf_001")
         vwrl = next(h for h in result["holdings"] if h["symbol"] == "VWRL.L")

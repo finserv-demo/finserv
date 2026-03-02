@@ -57,7 +57,6 @@ class TestISAContributions:
         result = validate_isa_contribution("user_001", 5000)
         assert result["valid"] is True
 
-    @pytest.mark.xfail(reason="BUG: ISA allowance validation uses wrong comparison (issue #18)")
     def test_validate_exceeds_allowance(self):
         result = validate_isa_contribution("user_001", 10000)
         # user_001 has 12500 contributed, allowance is 20000, so 7500 remaining
@@ -67,7 +66,6 @@ class TestISAContributions:
         result = validate_isa_contribution("user_001", -100)
         assert result["valid"] is False
 
-    @pytest.mark.xfail(reason="BUG: remaining allowance off by one tax year (issue #18)")
     def test_remaining_allowance(self):
         remaining = get_remaining_allowance("user_001")
         assert remaining == ISA_ANNUAL_ALLOWANCE - 12500.00
