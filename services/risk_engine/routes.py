@@ -5,15 +5,15 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.risk_engine.questionnaire import (
-    get_questionnaire,
-    calculate_risk_score,
-    get_recommended_allocation,
-)
 from services.risk_engine.db import (
     get_risk_profile,
-    save_risk_profile,
     save_questionnaire_response,
+    save_risk_profile,
+)
+from services.risk_engine.questionnaire import (
+    calculate_risk_score,
+    get_questionnaire,
+    get_recommended_allocation,
 )
 
 router = APIRouter()
@@ -83,7 +83,11 @@ async def get_user_risk_profile(user_id: str):
         "user_id": profile["user_id"],
         "score": profile["score"],
         "risk_level": profile.get("risk_category", "moderate"),
-        "calculated_at": profile["calculated_at"].isoformat() if isinstance(profile["calculated_at"], datetime) else profile["calculated_at"],
+        "calculated_at": (
+            profile["calculated_at"].isoformat()
+            if isinstance(profile["calculated_at"], datetime)
+            else profile["calculated_at"]
+        ),
     }
 
 

@@ -1,9 +1,9 @@
 """Shared Pydantic models used across all FinServ services."""
 
-from datetime import datetime, date
-from decimal import Decimal
+from datetime import date, datetime
 from enum import Enum
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 

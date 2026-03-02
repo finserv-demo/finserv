@@ -4,18 +4,17 @@ from datetime import datetime
 from typing import Optional
 
 from services.portfolio.db import (
-    get_portfolio,
+    add_transaction,
     get_holdings_for_portfolio,
+    get_portfolio,
     update_holding,
     update_portfolio,
-    add_transaction,
-    create_holding,
 )
 from services.portfolio.errors import (
-    PortfolioNotFoundError,
     InvalidAllocationError,
-    RebalanceError,
     MarketDataUnavailableError,
+    PortfolioNotFoundError,
+    RebalanceError,
 )
 
 
