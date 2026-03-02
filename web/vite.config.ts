@@ -12,8 +12,28 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
+      '/api/portfolio': {
         target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/api/tax': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
+      '/api/risk': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+      },
+      '/api/market-data': {
+        target: 'http://localhost:8003',
+        changeOrigin: true,
+      },
+      '/api/onboarding': {
+        target: 'http://localhost:8004',
+        changeOrigin: true,
+      },
+      '/api/notifications': {
+        target: 'http://localhost:8005',
         changeOrigin: true,
       },
     },
