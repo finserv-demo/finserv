@@ -133,13 +133,13 @@ def _write_github_output(key: str, value: str) -> None:
     """Write a key=value pair to GITHUB_OUTPUT for use in subsequent workflow steps."""
     github_output = os.environ.get("GITHUB_OUTPUT", "")
     if github_output:
-    with open(github_output, "a") as f:
-        if "\n" in value:
-            import uuid
-            delimiter = f"ghadelimiter_{uuid.uuid4().hex}"
-            f.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
-        else:
-            f.write(f"{key}={value}\n")
+        with open(github_output, "a") as f:
+            if "\n" in value:
+                import uuid
+                delimiter = f"ghadelimiter_{uuid.uuid4().hex}"
+                f.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
+            else:
+                f.write(f"{key}={value}\n")
 
 
 async def cmd_create_session(args: argparse.Namespace) -> None:
