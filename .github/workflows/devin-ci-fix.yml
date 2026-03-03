@@ -75,15 +75,17 @@ jobs:
           DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
           CI_FIX_PLAYBOOK_ID: ${{ vars.CI_FIX_PLAYBOOK_ID }}
           ACU_LIMIT_CI_FIX: ${{ vars.ACU_LIMIT_CI_FIX }}
+          INPUT_BRANCH: ${{ steps.failure.outputs.branch }}
+          INPUT_FAILED_JOBS: ${{ steps.failure.outputs.failed_jobs }}
+          INPUT_RUN_URL: ${{ steps.failure.outputs.run_url }}
         run: |
-          # Write CI failure context to a JSON file for the devin_api.py script
-          cat > /tmp/ci_fix_context.json <<EOF
-          {
-            "branch": "${{ steps.failure.outputs.branch }}",
-            "failed_jobs": "${{ steps.failure.outputs.failed_jobs }}",
-            "run_url": "${{ steps.failure.outputs.run_url }}"
-          }
-          EOF
+          # Build context JSON safely using jq to avoid shell injection
+          jq -n \
+            --arg branch "$INPUT_BRANCH" \
+            --arg failed_jobs "$INPUT_FAILED_JOBS" \
+            --arg run_url "$INPUT_RUN_URL" \
+            '{branch: $branch, failed_jobs: $failed_jobs, run_url: $run_url}' \
+            > /tmp/ci_fix_context.json
 
           python automation/devin_api.py create-session \
             --stage ci-fix \
