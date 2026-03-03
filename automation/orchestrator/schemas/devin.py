@@ -15,8 +15,8 @@ class DevinSession(BaseModel):
     url: str = ""
     status: str = "new"
     acus_consumed: float = 0.0
-    created_at: int = 0
-    updated_at: int = 0
+    created_at: str | int = 0
+    updated_at: str | int = 0
     tags: list[str] = []
     pull_requests: list[SessionPullRequest] = []
 
@@ -27,7 +27,7 @@ class Message(BaseModel):
     event_id: str = ""
     source: str = ""  # "user" or "devin"
     message: str = ""
-    created_at: int = 0
+    created_at: str | int = 0
 
 
 class MessagePage(BaseModel):
