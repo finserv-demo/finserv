@@ -1,17 +1,19 @@
 """Tests for portfolio calculator."""
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from services.portfolio.db import init_db, _portfolios, _holdings
 from services.portfolio.calculator import (
-    calculate_portfolio_value,
     calculate_portfolio_drift,
-    generate_rebalance_trades,
+    calculate_portfolio_value,
     execute_rebalance,
+    generate_rebalance_trades,
 )
+from services.portfolio.db import _holdings, _portfolios, init_db
 from services.portfolio.errors import PortfolioNotFoundError
 
 

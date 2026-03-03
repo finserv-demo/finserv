@@ -1,22 +1,24 @@
 """Tests for notification triggers."""
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from services.notifications.triggers import (
+    _alert_configs,
+    _notifications,
+    check_isa_allowance_trigger,
     check_portfolio_drift_trigger,
     check_price_change_trigger,
-    check_isa_allowance_trigger,
-    get_notifications_for_user,
     create_notification,
-    mark_as_read,
     get_alert_config,
-    update_alert_config,
+    get_notifications_for_user,
     init_notification_data,
-    _notifications,
-    _alert_configs,
+    mark_as_read,
+    update_alert_config,
 )
 
 

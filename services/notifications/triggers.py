@@ -8,7 +8,6 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-
 # In-memory store
 _notifications: list = []
 _alert_configs: dict = {}
@@ -37,7 +36,10 @@ def init_notification_data():
             "user_id": "user_001",
             "type": "email",
             "subject": "ISA Allowance Reminder",
-            "body": "You have £7,500 remaining of your £20,000 ISA allowance for 2024/25. The tax year ends on 5 April 2025.",
+            "body": (
+                "You have £7,500 remaining of your £20,000 ISA allowance"
+                " for 2024/25. The tax year ends on 5 April 2025."
+            ),
             "sent_at": datetime(2024, 11, 15, 10, 0, 0),
             "read": False,
             "metadata": {"remaining_allowance": 7500, "tax_year": "2024/25"},
@@ -85,7 +87,10 @@ def check_portfolio_drift_trigger(
             user_id=user_id,
             notification_type="email",
             subject="Portfolio Drift Alert",
-            body=f"Your portfolio {portfolio_id} has drifted {drift_pct:.1f}% from target allocations. Consider rebalancing.",
+            body=(
+                f"Your portfolio {portfolio_id} has drifted {drift_pct:.1f}%"
+                " from target allocations. Consider rebalancing."
+            ),
             metadata={
                 "portfolio_id": portfolio_id,
                 "drift_pct": drift_pct,

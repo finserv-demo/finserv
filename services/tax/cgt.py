@@ -4,16 +4,14 @@ Handles disposal calculations, annual exempt amount tracking,
 and bed-and-breakfasting rule enforcement.
 """
 
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from services.tax.constants import (
+    BED_AND_BREAKFAST_DAYS,
     CGT_ANNUAL_EXEMPT_AMOUNT,
     CGT_BASIC_RATE,
-    CGT_HIGHER_RATE,
-    BED_AND_BREAKFAST_DAYS,
 )
-
 
 # In-memory store for CGT events
 _cgt_events: list = []
@@ -128,7 +126,7 @@ def calculate_annual_cgt(user_id: str, tax_year: str) -> dict:
     vs other assets have different rates). Currently applies the same rate
     to everything.
     """
-    from services.tax.isa import get_tax_year_start, get_tax_year_end
+    from services.tax.isa import get_tax_year_end, get_tax_year_start
 
     year_start = get_tax_year_start(tax_year)
     year_end = get_tax_year_end(tax_year)

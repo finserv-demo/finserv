@@ -1,19 +1,20 @@
 """Tests for Capital Gains Tax calculations."""
 
-import pytest
-import sys
 import os
+import sys
 from datetime import date
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from services.tax.cgt import (
+    _cgt_events,
+    calculate_annual_cgt,
     calculate_gain_or_loss,
     check_bed_and_breakfast,
-    calculate_annual_cgt,
-    record_disposal,
-    get_cgt_summary,
     init_cgt_data,
-    _cgt_events,
+    record_disposal,
 )
 from services.tax.constants import CGT_ANNUAL_EXEMPT_AMOUNT
 
