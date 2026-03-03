@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # this client should be migrated back to v3.
 _DEVIN_API_BASE = "https://api.devin.ai/v1"
 
-_ACTIVE_STATUSES = {"new", "claimed", "running", "resuming"}
+_ACTIVE_STATUSES = {"new", "claimed", "running", "resuming", "suspended"}
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF_SECONDS = 5
 
@@ -187,7 +187,9 @@ class DevinClient:
     async def get_active_session_for_issue(self, issue_number: int) -> DevinSession | None:
         """Get the currently active session for an issue, or None.
 
-        A session is "active" if its status is in (new, claimed, running, resuming).
+        A session is "active" if its status is in (new, claimed, running,
+        resuming, suspended). "suspended" maps from v1's "blocked" status
+        and represents sessions waiting for human input.
         """
         sessions = await self.get_sessions_for_issue(issue_number)
         for session in sessions:
