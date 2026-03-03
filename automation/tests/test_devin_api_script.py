@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from automation.devin_api import (  # noqa: E402
     _extract_label_names,
     _format_comments,
+    build_ci_fix_prompt,
     build_implement_prompt,
     build_triage_prompt,
     cmd_check_active_session,
@@ -555,3 +556,131 @@ async def test_cmd_forward_comment_no_session(
         await cmd_forward_comment(args)
 
     mock_client.send_message.assert_not_called()
+
+
+# -- build_ci_fix_prompt --
+
+
+def test_build_ci_fix_prompt_basic() -> None:
+    prompt = build_ci_fix_prompt(
+        pr_number=15,
+        repo="finserv-demo/finserv",
+        branch="feature/add-dark-mode",
+        failed_jobs="Python Lint & Tests, Frontend Lint, Typecheck & Tests",
+        run_url="https://github.com/finserv-demo/finserv/actions/runs/123",
+    )
+
+    assert "CI failed on PR #15" in prompt
+    assert "finserv-demo/finserv" in prompt
+    assert "feature/add-dark-mode" in prompt
+    assert "Python Lint & Tests" in prompt
+    assert "Frontend Lint, Typecheck & Tests" in prompt
+    assert "https://github.com/finserv-demo/finserv/actions/runs/123" in prompt
+    assert "https://github.com/finserv-demo/finserv/pull/15" in prompt
+    assert "push a fix" in prompt
+
+
+def test_build_ci_fix_prompt_single_job() -> None:
+    prompt = build_ci_fix_prompt(
+        pr_number=7,
+        repo="org/repo",
+        branch="fix/typo",
+        failed_jobs="lint",
+        run_url="https://github.com/org/repo/actions/runs/456",
+    )
+
+    assert "PR #7" in prompt
+    assert "lint" in prompt
+    assert "fix/typo" in prompt
+
+
+# -- cmd_create_session ci-fix --
+
+
+@pytest.mark.asyncio
+async def test_cmd_create_session_ci_fix(
+    github_output_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
+    monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
+    monkeypatch.setenv("CI_FIX_PLAYBOOK_ID", "pb-cifix-001")
+    monkeypatch.setenv("ACU_LIMIT_CI_FIX", "20")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
+
+    # CI fix context file has different shape than issue context
+    ci_fix_context = {
+        "branch": "feature/new-endpoint",
+        "failed_jobs": "Python Lint & Tests",
+        "run_url": "https://github.com/finserv-demo/finserv/actions/runs/789",
+    }
+    ci_fix_file = tmp_path / "ci_fix_context.json"
+    ci_fix_file.write_text(json.dumps(ci_fix_context))
+
+    ci_fix_session = DevinSession(
+        session_id="sess-cifix-001",
+        url="https://app.devin.ai/sessions/sess-cifix-001",
+        status="new",
+    )
+    mock_client = AsyncMock()
+    mock_client.create_session.return_value = ci_fix_session
+
+    args = FakeArgs(
+        stage="ci-fix",
+        issue=15,
+        repo="finserv-demo/finserv",
+        context_file=str(ci_fix_file),
+    )
+
+    with patch("automation.devin_api.get_devin_client", return_value=mock_client):
+        await cmd_create_session(args)
+
+    call_kwargs = mock_client.create_session.call_args
+    assert call_kwargs.kwargs["playbook_id"] == "pb-cifix-001"
+    assert call_kwargs.kwargs["max_acu_limit"] == 20
+    assert "stage:ci-fix" in call_kwargs.kwargs["tags"]
+    assert "issue:15" in call_kwargs.kwargs["tags"]
+    assert "CI failed on PR #15" in call_kwargs.kwargs["prompt"]
+    assert "Python Lint & Tests" in call_kwargs.kwargs["prompt"]
+    assert "feature/new-endpoint" in call_kwargs.kwargs["prompt"]
+
+    output_content = github_output_file.read_text()
+    assert "session_created=true" in output_content
+    assert "session_id=sess-cifix-001" in output_content
+
+
+@pytest.mark.asyncio
+async def test_cmd_create_session_ci_fix_no_playbook(
+    github_output_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When CI_FIX_PLAYBOOK_ID is empty, playbook_id should be None."""
+    monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
+    monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
+    monkeypatch.setenv("CI_FIX_PLAYBOOK_ID", "")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
+
+    ci_fix_context = {
+        "branch": "fix/lint",
+        "failed_jobs": "lint",
+        "run_url": "https://github.com/org/repo/actions/runs/1",
+    }
+    ci_fix_file = tmp_path / "ci_fix_context.json"
+    ci_fix_file.write_text(json.dumps(ci_fix_context))
+
+    mock_client = AsyncMock()
+    mock_client.create_session.return_value = DevinSession(
+        session_id="s1", url="u1", status="new"
+    )
+
+    args = FakeArgs(
+        stage="ci-fix", issue=1, repo="org/repo", context_file=str(ci_fix_file)
+    )
+
+    with patch("automation.devin_api.get_devin_client", return_value=mock_client):
+        await cmd_create_session(args)
+
+    call_kwargs = mock_client.create_session.call_args
+    assert call_kwargs.kwargs["playbook_id"] is None

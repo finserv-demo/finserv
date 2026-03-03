@@ -104,6 +104,39 @@ def build_implement_prompt(issue_number: int, repo: str, context: dict) -> str:
     return prompt
 
 
+def build_ci_fix_prompt(
+    pr_number: int,
+    repo: str,
+    branch: str,
+    failed_jobs: str,
+    run_url: str,
+) -> str:
+    """Build the CI fix session prompt from failure details.
+
+    Args:
+        pr_number: The pull request number.
+        repo: Repository in owner/repo format.
+        branch: The PR branch name.
+        failed_jobs: Comma-separated list of failed job names.
+        run_url: URL to the failed CI run.
+
+    Returns:
+        Formatted prompt string for the CI fix session.
+    """
+    prompt = (
+        f"CI failed on PR #{pr_number} in {repo}.\n\n"
+        f"**Failed jobs:** {failed_jobs}\n"
+        f"**CI run:** {run_url}\n"
+        f"**Branch:** {branch}\n"
+        f"**Repository:** {repo}\n"
+        f"**PR URL:** https://github.com/{repo}/pull/{pr_number}\n\n"
+        f"Read the CI logs, identify the root cause, and push a fix to the branch. "
+        f"Comment on the PR explaining what failed and what you changed."
+    )
+
+    return prompt
+
+
 def _extract_label_names(labels: list) -> list[str]:
     """Extract label name strings from either dicts or strings."""
     result: list[str] = []
@@ -155,10 +188,21 @@ async def cmd_create_session(args: argparse.Namespace) -> None:
         prompt = build_triage_prompt(args.issue, args.repo, context)
         playbook_id = os.environ.get("TRIAGE_PLAYBOOK_ID", "") or None
         acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "8"))
-    else:
+    elif args.stage == "implement":
         prompt = build_implement_prompt(args.issue, args.repo, context)
         playbook_id = os.environ.get("IMPLEMENT_PLAYBOOK_ID", "") or None
         acu_limit = int(os.environ.get("ACU_LIMIT_IMPLEMENT", "50"))
+    else:
+        # ci-fix stage: context file contains CI failure details, not issue context
+        prompt = build_ci_fix_prompt(
+            pr_number=args.issue,
+            repo=args.repo,
+            branch=context.get("branch", ""),
+            failed_jobs=context.get("failed_jobs", ""),
+            run_url=context.get("run_url", ""),
+        )
+        playbook_id = os.environ.get("CI_FIX_PLAYBOOK_ID", "") or None
+        acu_limit = int(os.environ.get("ACU_LIMIT_CI_FIX", "20"))
 
     tags = [
         "backlog-auto",
@@ -255,7 +299,7 @@ def main() -> None:
 
     # create-session
     create_parser = subparsers.add_parser("create-session", help="Create a Devin session")
-    create_parser.add_argument("--stage", required=True, choices=["triage", "implement"])
+    create_parser.add_argument("--stage", required=True, choices=["triage", "implement", "ci-fix"])
     create_parser.add_argument("--issue", required=True, type=int)
     create_parser.add_argument("--repo", required=True)
     create_parser.add_argument("--context-file", required=True, help="Path to JSON file with issue context")
