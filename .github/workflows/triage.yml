@@ -25,14 +25,12 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install httpx pydantic
+      - name: Add eyes reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
+            -f content=eyes --silent || true
 
       - name: Ensure devin labels exist
         env:
@@ -50,12 +48,14 @@ jobs:
             --add-label "devin:triage" \
             --repo ${{ github.repository }}
 
-      - name: Add eyes reaction
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
-            -f content=eyes --silent || true
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install httpx pydantic
 
       - name: Fetch issue context
         env:
@@ -96,9 +96,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/triage_comment.md
+          ### Devin AI Engineer
+
+          I'm triaging this issue now. Here's what to expect:
+
+          **I will automatically:**
+          - Analyze the issue and assess scope, complexity, and approach
+          - Post my triage findings as a comment when complete
+          - Add the `devin:triaged` label when triage is done
+
+          **Available commands:**
+          - `/proceed` or `/sgtm` — Approve and start implementation
+          - `/skip` — Skip this issue (stops Devin)
+          - `/close` — Close the issue and terminate any active session
+          - `/retriage` — Start triage over from scratch
+          - Any other comment will be forwarded to the active Devin session
+
+          **Devin session:** SESSION_URL
+          COMMENT
+          sed -i 's/^          //' /tmp/triage_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Devin triage session started: ${{ steps.session.outputs.session_url }}"
+            --body-file /tmp/triage_comment.md
 
   # -- Manual devin:triage label added (via UI or /triage command with PAT) --
   start-triage-on-label:
@@ -109,6 +129,13 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Add eyes reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
+            -f content=eyes --silent || true
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -135,14 +162,6 @@ jobs:
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --body "Skipping triage — an active Devin session already exists: ${{ steps.check.outputs.active_session_url }}"
-
-      - name: Add eyes reaction
-        if: steps.check.outputs.has_active != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
-            -f content=eyes --silent || true
 
       - name: Fetch issue context
         if: steps.check.outputs.has_active != 'true'
@@ -185,9 +204,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/triage_comment.md
+          ### Devin AI Engineer
+
+          I'm triaging this issue now. Here's what to expect:
+
+          **I will automatically:**
+          - Analyze the issue and assess scope, complexity, and approach
+          - Post my triage findings as a comment when complete
+          - Add the `devin:triaged` label when triage is done
+
+          **Available commands:**
+          - `/proceed` or `/sgtm` — Approve and start implementation
+          - `/skip` — Skip this issue (stops Devin)
+          - `/close` — Close the issue and terminate any active session
+          - `/retriage` — Start triage over from scratch
+          - Any other comment will be forwarded to the active Devin session
+
+          **Devin session:** SESSION_URL
+          COMMENT
+          sed -i 's/^          //' /tmp/triage_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Devin triage session started: ${{ steps.session.outputs.session_url }}"
+            --body-file /tmp/triage_comment.md
 
   # -- Issue closed externally: terminate active session, clean up labels --
   cleanup-on-close:

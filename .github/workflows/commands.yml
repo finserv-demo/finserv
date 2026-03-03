@@ -115,9 +115,28 @@ jobs:
             if [ "$created" = "true" ]; then
               session_url=$(grep 'session_url=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | cut -d= -f2- || true)
               if [ -n "$session_url" ]; then
+                cat <<'COMMENT' | sed "s|SESSION_URL|$session_url|g" > /tmp/implement_comment.md
+                ### Devin AI Engineer
+
+                I'm implementing the changes for this issue now. Here's what to expect:
+
+                **I will automatically:**
+                - Implement the solution based on the triage analysis
+                - Open a pull request when implementation is complete
+                - Update the issue with the `devin:pr-opened` label
+
+                **Available commands:**
+                - `/close` \u2014 Close the issue and terminate the session
+                - `/skip` \u2014 Skip this issue (stops Devin)
+                - `/retriage` \u2014 Go back to triage
+                - Any other comment will be forwarded to the active Devin session
+
+                **Devin session:** SESSION_URL
+                COMMENT
+                sed -i 's/^                //' /tmp/implement_comment.md
                 gh issue comment ${{ github.event.issue.number }} \
                   --repo ${{ github.repository }} \
-                  --body "Devin implement session started: $session_url"
+                  --body-file /tmp/implement_comment.md
               fi
             else
               # Rollback: restore devin:triaged, remove devin:implement
@@ -227,9 +246,29 @@ jobs:
             if [ "$created" = "true" ]; then
               session_url=$(grep 'session_url=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | cut -d= -f2- || true)
               if [ -n "$session_url" ]; then
+                cat <<'COMMENT' | sed "s|SESSION_URL|$session_url|g" > /tmp/triage_comment.md
+                ### Devin AI Engineer
+
+                I'm triaging this issue now. Here's what to expect:
+
+                **I will automatically:**
+                - Analyze the issue and assess scope, complexity, and approach
+                - Post my triage findings as a comment when complete
+                - Add the `devin:triaged` label when triage is done
+
+                **Available commands:**
+                - `/proceed` or `/sgtm` \u2014 Approve and start implementation
+                - `/skip` \u2014 Skip this issue (stops Devin)
+                - `/close` \u2014 Close the issue and terminate any active session
+                - `/retriage` \u2014 Start triage over from scratch
+                - Any other comment will be forwarded to the active Devin session
+
+                **Devin session:** SESSION_URL
+                COMMENT
+                sed -i 's/^                //' /tmp/triage_comment.md
                 gh issue comment ${{ github.event.issue.number }} \
                   --repo ${{ github.repository }} \
-                  --body "Devin triage session started: $session_url"
+                  --body-file /tmp/triage_comment.md
               fi
             else
               # Rollback: remove devin:triage
@@ -307,9 +346,29 @@ jobs:
           if [ "$created" = "true" ]; then
             session_url=$(grep 'session_url=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | cut -d= -f2- || true)
             if [ -n "$session_url" ]; then
+              cat <<'COMMENT' | sed "s|SESSION_URL|$session_url|g" > /tmp/triage_comment.md
+              ### Devin AI Engineer
+
+              I'm triaging this issue now. Here's what to expect:
+
+              **I will automatically:**
+              - Analyze the issue and assess scope, complexity, and approach
+              - Post my triage findings as a comment when complete
+              - Add the `devin:triaged` label when triage is done
+
+              **Available commands:**
+              - `/proceed` or `/sgtm` \u2014 Approve and start implementation
+              - `/skip` \u2014 Skip this issue (stops Devin)
+              - `/close` \u2014 Close the issue and terminate any active session
+              - `/retriage` \u2014 Start triage over from scratch
+              - Any other comment will be forwarded to the active Devin session
+
+              **Devin session:** SESSION_URL
+              COMMENT
+              sed -i 's/^              //' /tmp/triage_comment.md
               gh issue comment ${{ github.event.issue.number }} \
                 --repo ${{ github.repository }} \
-                --body "Devin triage session started: $session_url"
+                --body-file /tmp/triage_comment.md
             fi
           else
             # Rollback: remove devin:triage (previous session was already terminated)

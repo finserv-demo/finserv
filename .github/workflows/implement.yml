@@ -19,6 +19,13 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Add eyes reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
+            -f content=eyes --silent || true
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -45,14 +52,6 @@ jobs:
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --body "Skipping implement — an active Devin session already exists: ${{ steps.check.outputs.active_session_url }}"
-
-      - name: Add eyes reaction
-        if: steps.check.outputs.has_active != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
-            -f content=eyes --silent || true
 
       - name: Fetch issue context
         if: steps.check.outputs.has_active != 'true'
@@ -95,6 +94,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/implement_comment.md
+          ### Devin AI Engineer
+
+          I'm implementing the changes for this issue now. Here's what to expect:
+
+          **I will automatically:**
+          - Implement the solution based on the triage analysis
+          - Open a pull request when implementation is complete
+          - Update the issue with the `devin:pr-opened` label
+
+          **Available commands:**
+          - `/close` — Close the issue and terminate the session
+          - `/skip` — Skip this issue (stops Devin)
+          - `/retriage` — Go back to triage
+          - Any other comment will be forwarded to the active Devin session
+
+          **Devin session:** SESSION_URL
+          COMMENT
+          sed -i 's/^          //' /tmp/implement_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Devin implement session started: ${{ steps.session.outputs.session_url }}"
+            --body-file /tmp/implement_comment.md
