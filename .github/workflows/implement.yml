@@ -94,25 +94,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/implement_comment.md
-          ### Devin AI Engineer
-
-          I'm implementing the changes for this issue now. Here's what to expect:
-
-          **I will automatically:**
-          - Implement the solution based on the triage analysis
-          - Open a pull request when implementation is complete
-          - Update the issue with the `devin:pr-opened` label
-
-          **Available commands:**
-          - `/close` — Close the issue and terminate the session
-          - `/skip` — Skip this issue (stops Devin)
-          - `/retriage` — Go back to triage
-          - Any other comment will be forwarded to the active Devin session
-
-          **Devin session:** SESSION_URL
-          COMMENT
-          sed -i 's/^          //' /tmp/implement_comment.md
+          {
+            echo '### Devin AI Engineer'
+            echo ''
+            echo "I'm implementing the changes for this issue now. Here's what to expect:"
+            echo ''
+            echo '**I will automatically:**'
+            echo '- Implement the solution based on the triage analysis'
+            echo '- Open a pull request when implementation is complete'
+            echo '- Update the issue with the `devin:pr-opened` label'
+            echo ''
+            echo '**Available commands:**'
+            echo '- `/close` — Close the issue and terminate the session'
+            echo '- `/skip` — Skip this issue (stops Devin)'
+            echo '- `/retriage` — Go back to triage'
+            echo '- Any other comment will be forwarded to the active Devin session'
+            echo ''
+            echo "**Devin session:** ${{ steps.session.outputs.session_url }}"
+          } > /tmp/implement_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --body-file /tmp/implement_comment.md

@@ -96,26 +96,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/triage_comment.md
-          ### Devin AI Engineer
-
-          I'm triaging this issue now. Here's what to expect:
-
-          **I will automatically:**
-          - Analyze the issue and assess scope, complexity, and approach
-          - Post my triage findings as a comment when complete
-          - Add the `devin:triaged` label when triage is done
-
-          **Available commands:**
-          - `/proceed` or `/sgtm` — Approve and start implementation
-          - `/skip` — Skip this issue (stops Devin)
-          - `/close` — Close the issue and terminate any active session
-          - `/retriage` — Start triage over from scratch
-          - Any other comment will be forwarded to the active Devin session
-
-          **Devin session:** SESSION_URL
-          COMMENT
-          sed -i 's/^          //' /tmp/triage_comment.md
+          {
+            echo '### Devin AI Engineer'
+            echo ''
+            echo "I'm triaging this issue now. Here's what to expect:"
+            echo ''
+            echo '**I will automatically:**'
+            echo '- Analyze the issue and assess scope, complexity, and approach'
+            echo '- Post my triage findings as a comment when complete'
+            echo '- Add the `devin:triaged` label when triage is done'
+            echo ''
+            echo '**Available commands:**'
+            echo '- `/proceed` or `/sgtm` — Approve and start implementation'
+            echo '- `/skip` — Skip this issue (stops Devin)'
+            echo '- `/close` — Close the issue and terminate any active session'
+            echo '- `/retriage` — Start triage over from scratch'
+            echo '- Any other comment will be forwarded to the active Devin session'
+            echo ''
+            echo "**Devin session:** ${{ steps.session.outputs.session_url }}"
+          } > /tmp/triage_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --body-file /tmp/triage_comment.md
@@ -204,26 +203,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat <<'COMMENT' | sed "s|SESSION_URL|${{ steps.session.outputs.session_url }}|g" > /tmp/triage_comment.md
-          ### Devin AI Engineer
-
-          I'm triaging this issue now. Here's what to expect:
-
-          **I will automatically:**
-          - Analyze the issue and assess scope, complexity, and approach
-          - Post my triage findings as a comment when complete
-          - Add the `devin:triaged` label when triage is done
-
-          **Available commands:**
-          - `/proceed` or `/sgtm` — Approve and start implementation
-          - `/skip` — Skip this issue (stops Devin)
-          - `/close` — Close the issue and terminate any active session
-          - `/retriage` — Start triage over from scratch
-          - Any other comment will be forwarded to the active Devin session
-
-          **Devin session:** SESSION_URL
-          COMMENT
-          sed -i 's/^          //' /tmp/triage_comment.md
+          {
+            echo '### Devin AI Engineer'
+            echo ''
+            echo "I'm triaging this issue now. Here's what to expect:"
+            echo ''
+            echo '**I will automatically:**'
+            echo '- Analyze the issue and assess scope, complexity, and approach'
+            echo '- Post my triage findings as a comment when complete'
+            echo '- Add the `devin:triaged` label when triage is done'
+            echo ''
+            echo '**Available commands:**'
+            echo '- `/proceed` or `/sgtm` — Approve and start implementation'
+            echo '- `/skip` — Skip this issue (stops Devin)'
+            echo '- `/close` — Close the issue and terminate any active session'
+            echo '- `/retriage` — Start triage over from scratch'
+            echo '- Any other comment will be forwarded to the active Devin session'
+            echo ''
+            echo "**Devin session:** ${{ steps.session.outputs.session_url }}"
+          } > /tmp/triage_comment.md
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --body-file /tmp/triage_comment.md
