@@ -34,6 +34,14 @@ jobs:
       - name: Install dependencies
         run: pip install httpx pydantic
 
+      - name: Ensure devin labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for label in devin:triage devin:triaged devin:implement devin:pr-opened devin:done devin:escalated devin:skip; do
+            gh label create "$label" --repo ${{ github.repository }} --color ededed --force 2>/dev/null || true
+          done
+
       - name: Add devin:triage label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
