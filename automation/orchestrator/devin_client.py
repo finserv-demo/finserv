@@ -3,7 +3,7 @@ import logging
 
 import httpx
 
-from orchestrator.schemas.devin import DevinSession, Message, MessagePage, Playbook, SessionPullRequest
+from automation.orchestrator.schemas.devin import DevinSession, Message, MessagePage, Playbook, SessionPullRequest
 
 logger = logging.getLogger(__name__)
 
