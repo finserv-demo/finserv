@@ -126,9 +126,9 @@ jobs:
                 - Update the issue with the `devin:pr-opened` label
 
                 **Available commands:**
-                - `/close` \u2014 Close the issue and terminate the session
-                - `/skip` \u2014 Skip this issue (stops Devin)
-                - `/retriage` \u2014 Go back to triage
+                - `/close` — Close the issue and terminate the session
+                - `/skip` — Skip this issue (stops Devin)
+                - `/retriage` — Go back to triage
                 - Any other comment will be forwarded to the active Devin session
 
                 **Devin session:** SESSION_URL
@@ -257,10 +257,10 @@ jobs:
                 - Add the `devin:triaged` label when triage is done
 
                 **Available commands:**
-                - `/proceed` or `/sgtm` \u2014 Approve and start implementation
-                - `/skip` \u2014 Skip this issue (stops Devin)
-                - `/close` \u2014 Close the issue and terminate any active session
-                - `/retriage` \u2014 Start triage over from scratch
+                - `/proceed` or `/sgtm` — Approve and start implementation
+                - `/skip` — Skip this issue (stops Devin)
+                - `/close` — Close the issue and terminate any active session
+                - `/retriage` — Start triage over from scratch
                 - Any other comment will be forwarded to the active Devin session
 
                 **Devin session:** SESSION_URL
@@ -357,10 +357,10 @@ jobs:
               - Add the `devin:triaged` label when triage is done
 
               **Available commands:**
-              - `/proceed` or `/sgtm` \u2014 Approve and start implementation
-              - `/skip` \u2014 Skip this issue (stops Devin)
-              - `/close` \u2014 Close the issue and terminate any active session
-              - `/retriage` \u2014 Start triage over from scratch
+              - `/proceed` or `/sgtm` — Approve and start implementation
+              - `/skip` — Skip this issue (stops Devin)
+              - `/close` — Close the issue and terminate any active session
+              - `/retriage` — Start triage over from scratch
               - Any other comment will be forwarded to the active Devin session
 
               **Devin session:** SESSION_URL
