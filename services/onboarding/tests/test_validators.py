@@ -1,18 +1,18 @@
 """Tests for onboarding validators."""
 
-import pytest
-import sys
 import os
+import sys
 from datetime import date
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from services.onboarding.validators import (
+    validate_date_of_birth,
     validate_email,
     validate_ni_number,
-    validate_postcode,
-    validate_phone,
-    validate_date_of_birth,
     validate_onboarding_data,
+    validate_phone,
+    validate_postcode,
 )
 
 
