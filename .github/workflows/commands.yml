@@ -170,7 +170,7 @@ jobs:
 
             # 2. Fall back to the most recent session (any status)
             session_id=$(echo "$response" | jq -r '
-              [.sessions[] | sort_by(.created_at)] | last | .session_id // empty')
+              [.sessions[]] | sort_by(.created_at) | last | .session_id // empty')
 
             if [ -z "$session_id" ]; then
               echo "::warning::No sessions exist for issue #${issue} — comment from @${author} not forwarded"
