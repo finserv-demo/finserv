@@ -1,14 +1,13 @@
 """FastAPI routes for the market data service."""
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from services.market_data.provider import (
+    get_available_symbols,
+    get_historical_prices,
     get_price,
     get_prices,
-    get_historical_prices,
-    get_available_symbols,
 )
 
 router = APIRouter()
