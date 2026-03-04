@@ -63,7 +63,7 @@ class DevinClient:
         url: str,
         *,
         json: dict | list | None = None,
-        params: dict | None = None,
+        params: dict | list[tuple[str, str | int]] | None = None,
     ) -> httpx.Response:
         """Make an HTTP request with retry on 429 (rate limit)."""
         for attempt in range(_MAX_RETRIES):
