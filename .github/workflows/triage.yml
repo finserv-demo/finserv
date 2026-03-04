@@ -83,19 +83,19 @@ jobs:
             echo "::error::Failed to create triage session: HTTP ${http_code}"
           fi
 
-      - name: Rollback — session creation failed
-        if: always() && steps.session.outputs.session_created != 'true'
+      - name: Notify — session creation failed
+        if: >-
+          always() &&
+          steps.session.conclusion == 'failure' &&
+          steps.session.outputs.session_created != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SESSION_ERROR: ${{ steps.session.outputs.session_error }}
         run: |
-          # Remove label in case it was added by a race condition
-          gh issue edit ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --remove-label "devin:triage" 2>/dev/null || true
+          error_detail="${SESSION_ERROR:-unknown error}"
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Failed to start Devin triage session: ${SESSION_ERROR}. You can retry by adding the \`devin:triage\` label or commenting \`/triage\`."
+            --body "Failed to start Devin triage session: ${error_detail}. You can retry by adding the \`devin:triage\` label or commenting \`/triage\`."
 
   # ── Manual devin:triage label added (via UI or /triage command) ──
   start-triage-on-label:
