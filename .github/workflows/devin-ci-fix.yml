@@ -97,23 +97,31 @@ jobs:
         if: steps.session.outputs.session_created == 'true' && steps.session.outputs.session_url
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.failure.outputs.pr_number }}
+          FAILED_JOBS: ${{ steps.failure.outputs.failed_jobs }}
+          RUN_URL: ${{ steps.failure.outputs.run_url }}
+          SESSION_URL: ${{ steps.session.outputs.session_url }}
         run: |
-          gh pr comment ${{ steps.failure.outputs.pr_number }} \
+          gh pr comment "$PR_NUMBER" \
             --repo ${{ github.repository }} \
             --body "CI failed — Devin is investigating and will push a fix.
 
-          **Failed jobs:** ${{ steps.failure.outputs.failed_jobs }}
-          **CI run:** ${{ steps.failure.outputs.run_url }}
-          **Devin session:** ${{ steps.session.outputs.session_url }}"
+          **Failed jobs:** $FAILED_JOBS
+          **CI run:** $RUN_URL
+          **Devin session:** $SESSION_URL"
 
       - name: Comment on PR -- session creation failed
         if: steps.session.outputs.session_created == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.failure.outputs.pr_number }}
+          SESSION_ERROR: ${{ steps.session.outputs.session_error }}
+          FAILED_JOBS: ${{ steps.failure.outputs.failed_jobs }}
+          RUN_URL: ${{ steps.failure.outputs.run_url }}
         run: |
-          gh pr comment ${{ steps.failure.outputs.pr_number }} \
+          gh pr comment "$PR_NUMBER" \
             --repo ${{ github.repository }} \
-            --body "CI failed but could not start a Devin fix session: ${{ steps.session.outputs.session_error }}
+            --body "CI failed but could not start a Devin fix session: $SESSION_ERROR
 
-          **Failed jobs:** ${{ steps.failure.outputs.failed_jobs }}
-          **CI run:** ${{ steps.failure.outputs.run_url }}"
+          **Failed jobs:** $FAILED_JOBS
+          **CI run:** $RUN_URL"
