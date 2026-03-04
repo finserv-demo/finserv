@@ -129,7 +129,7 @@ a bug.
    ```
 
 4. Add the appropriate sizing label to the issue (use `gh issue edit --add-label`):
-   - `devin:green`, `devin:yellow`, or `devin:red`
+   - `devin:small`, `devin:medium`, or `devin:large`
 
 5. Swap status labels (use `gh issue edit --remove-label "devin:triage" --add-label "devin:triaged"`).
 
