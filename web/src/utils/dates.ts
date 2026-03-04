@@ -1,5 +1,5 @@
 /**
- * Date formatting utilities for FinServ.
+ * Date formatting utilities for FinServe.
  *
  * UK-specific date handling: dd/mm/yyyy format, BST/GMT timezone.
  *

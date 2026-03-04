@@ -1,5 +1,5 @@
 /**
- * Currency formatting utilities for FinServ.
+ * Currency formatting utilities for FinServe.
  *
  * All amounts should be in GBP (£) since this is a UK platform.
  *

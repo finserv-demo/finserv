@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.market_data.routes import router
 
 app = FastAPI(
-    title="FinServ Market Data Service",
+    title="FinServe Market Data Service",
     description="Market price feeds, caching, and retries",
     version="0.1.0",
 )

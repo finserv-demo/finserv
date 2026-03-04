@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.onboarding.routes import router
 
 app = FastAPI(
-    title="FinServ Onboarding Service",
+    title="FinServe Onboarding Service",
     description="KYC, identity verification, postcode validation",
     version="0.1.0",
 )

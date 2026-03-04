@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.tax.routes import router
 
 app = FastAPI(
-    title="FinServ Tax Service",
+    title="FinServe Tax Service",
     description="UK tax calculations: ISA, CGT, bed-and-breakfasting",
     version="0.1.0",
 )

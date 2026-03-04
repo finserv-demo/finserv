@@ -1,6 +1,6 @@
-# FinServ
+# FinServe
 
-**FinServ** is a UK-based robo-advisor platform — think Wealthfront, but for the UK market. We handle ISA management, portfolio rebalancing, tax-loss harvesting (with proper bed-and-breakfasting compliance), and automated risk profiling.
+**FinServe** is a UK-based robo-advisor platform — think Wealthfront, but for the UK market. We handle ISA management, portfolio rebalancing, tax-loss harvesting (with proper bed-and-breakfasting compliance), and automated risk profiling.
 
 ## Architecture
 
@@ -63,4 +63,4 @@ cd web && npm test
 
 ## Team
 
-Built by the FinServ engineering team in London.
+Built by the FinServe engineering team in London.

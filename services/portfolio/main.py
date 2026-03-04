@@ -12,7 +12,7 @@ from services.portfolio.db import init_db
 from services.portfolio.routes import router
 
 app = FastAPI(
-    title="FinServ Portfolio Service",
+    title="FinServe Portfolio Service",
     description="Portfolio management, rebalancing, and holdings tracking",
     version="0.1.0",
 )

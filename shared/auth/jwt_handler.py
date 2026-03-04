@@ -1,4 +1,4 @@
-"""JWT authentication utilities for FinServ services."""
+"""JWT authentication utilities for FinServe services."""
 
 import os
 from datetime import datetime, timedelta

@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.notifications.routes import router
 
 app = FastAPI(
-    title="FinServ Notifications Service",
+    title="FinServe Notifications Service",
     description="Email/SMS triggers and threshold alerts",
     version="0.1.0",
 )

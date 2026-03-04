@@ -12,7 +12,7 @@ from services.risk_engine.db import init_db
 from services.risk_engine.routes import router
 
 app = FastAPI(
-    title="FinServ Risk Engine",
+    title="FinServe Risk Engine",
     description="Risk profiling questionnaires and scoring",
     version="0.1.0",
 )
