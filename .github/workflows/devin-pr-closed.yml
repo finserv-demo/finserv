@@ -91,38 +91,9 @@ jobs:
             --remove-label "$pr_label" \
             --add-label "devin:triaged"
 
-          # Post comment explaining what happened
+          # Post comment explaining what happened.
+          # Note: the Devin session is intentionally kept alive so users can
+          # re-engage via issue comments (commands.yml "message first, create
+          # never" policy at lines 124-132).
           gh issue comment "$issue" --repo "$repo" \
-            --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can retry implementation with \`/proceed\` or retriage with \`/retriage\`."
-
-      - name: Terminate active Devin session
-        if: always() && steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
-        env:
-          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
-        run: |
-          issue=${{ steps.extract.outputs.issue_number }}
-
-          # Find active sessions (matching triage.yml pattern)
-          response=$(curl -s \
-            -X GET "https://api.devin.ai/v1/sessions" \
-            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto" \
-            --data-urlencode "tags=issue:${issue}" \
-            --data-urlencode "limit=100")
-
-          session_ids=$(echo "$response" | jq -r '
-            [.sessions[] | select(.status as $s |
-              ["running","new","claimed","resuming","suspended"] | index($s))] |
-            .[] | .session_id' 2>/dev/null || true)
-
-          if [ -z "$session_ids" ]; then
-            echo "No active Devin sessions found for issue #${issue}"
-            exit 0
-          fi
-
-          # Terminate each active session
-          for sid in $session_ids; do
-            echo "Terminating session $sid..."
-            curl -s -X DELETE "https://api.devin.ai/v1/sessions/${sid}" \
-              -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
-          done
+            --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can comment on this issue to guide the existing Devin session, or add the \`devin:implement\` label to start a fresh implementation attempt."
