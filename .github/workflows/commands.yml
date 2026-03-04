@@ -161,6 +161,8 @@ jobs:
               -d "$(jq -n --arg m "$message" '{message: $m}')"
             echo "Forwarded comment from @${author} to session ${session_id}"
           else
+            # NOTE: This follow-up logic is mirrored in automation/devin_api.py
+            # (cmd_forward_comment).  Keep both in sync when changing behavior.
             echo "No active session for issue #${issue} — checking labels for follow-up eligibility"
 
             # Check if issue has a qualifying label (devin:triage or devin:triaged)

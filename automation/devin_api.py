@@ -210,7 +210,7 @@ async def cmd_create_session(args: argparse.Namespace) -> None:
     if args.stage == "triage":
         prompt = build_triage_prompt(args.issue, args.repo, context)
         playbook_id = os.environ.get("TRIAGE_PLAYBOOK_ID", "") or None
-        acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "8"))
+        acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "25"))
     else:
         prompt = build_implement_prompt(args.issue, args.repo, context)
         playbook_id = os.environ.get("IMPLEMENT_PLAYBOOK_ID", "") or None
@@ -353,8 +353,12 @@ async def cmd_forward_comment(args: argparse.Namespace) -> None:
     )
 
     playbook_id = os.environ.get("TRIAGE_PLAYBOOK_ID", "") or None
-    acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "8"))
+    # Default must match the workflow fallback in commands.yml (currently 25).
+    acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "25"))
 
+    # NOTE: The production path for follow-up session creation is the inline
+    # bash in .github/workflows/commands.yml (lines ~164-243).  This Python
+    # implementation mirrors it for CLI/test use.  Keep both in sync.
     tags = [
         "backlog-auto",
         f"issue:{args.issue}",
