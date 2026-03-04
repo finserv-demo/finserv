@@ -1,9 +1,13 @@
 name: PR Status Sync
 
 # Automatically swap devin:pr-in-progress <-> devin:pr-ready based on
-# CI check results and unresolved review comments. This keeps the
-# dashboard accurate without relying on the implement playbook to
-# self-report readiness.
+# review thread resolution status. CI status is NOT part of the label
+# decision — it's displayed separately in the dashboard.
+#
+# pr-ready criteria (all three must be true):
+#   1. At least one review has been submitted (any state)
+#   2. Zero unresolved review threads (GraphQL reviewThreads)
+#   3. No reviewer has CHANGES_REQUESTED as their latest state
 
 on:
   check_suite:
@@ -80,74 +84,77 @@ jobs:
             echo "current_ready=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check CI and review status
+      - name: Check review status
         if: steps.pr.outputs.skip != 'true'
         id: status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          pr_number="${{ steps.pr.outputs.pr_number }}"
-          repo="${{ github.repository }}"
+          repo="${REPO_OWNER}/${REPO_NAME}"
 
-          # Check CI status — all checks must pass
-          # Use the combined status + check runs to determine overall CI state
-          check_runs=$(gh pr checks "$pr_number" --repo "$repo" 2>/dev/null || echo "")
+          # ── Condition 1: At least one review submitted ──
+          # Prevents race condition where a brand-new PR with 0 reviews
+          # would vacuously satisfy "no unresolved threads"
+          review_count=$(gh pr view "$PR_NUMBER" --repo "$repo" --json reviews -q '.reviews | length' 2>/dev/null || echo "0")
+          has_any_review=$([ "$review_count" -gt 0 ] && echo true || echo false)
 
-          ci_ok=true
-          ci_pending=false
+          # ── Condition 2: Zero unresolved review threads ──
+          # Uses GraphQL to check review threads (inline code comments).
+          # This is what Devin auto-review creates and auto-fix resolves.
+          thread_data=$(gh api graphql -f query='
+            query($owner: String!, $name: String!, $number: Int!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $number) {
+                  reviewThreads(first: 100) {
+                    nodes {
+                      isResolved
+                      isOutdated
+                    }
+                    totalCount
+                  }
+                }
+              }
+            }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F number="$PR_NUMBER" 2>/dev/null || echo '{}')
 
-          if [ -z "$check_runs" ]; then
-            # No checks at all — treat as pending
-            ci_pending=true
-            ci_ok=false
-          else
-            # Parse check run results — look for any failures or pending checks
-            # Exclude this workflow's own check to avoid circular dependency
-            while IFS=$'\t' read -r name status _; do
-              # Skip empty lines
-              [ -z "$name" ] && continue
-              # Skip this workflow's own check
-              [ "$name" = "sync-pr-label" ] && continue
+          unresolved_threads=$(echo "$thread_data" | jq '
+            [.data.repository.pullRequest.reviewThreads.nodes[]
+             | select(.isResolved == false)]
+            | length' 2>/dev/null || echo "0")
 
-              case "$status" in
-                pass|skipping|"") ;;  # passed, skipped, or no status
-                fail|cancel)
-                  ci_ok=false
-                  ;;
-                pending)
-                  ci_pending=true
-                  ci_ok=false
-                  ;;
-                *)
-                  # Unknown status — treat as not passing
-                  ci_ok=false
-                  ;;
-              esac
-            done <<< "$check_runs"
-          fi
+          no_unresolved_threads=$([ "$unresolved_threads" -eq 0 ] && echo true || echo false)
 
-          # Check for unresolved review comments
-          # Fetch reviews and look for CHANGES_REQUESTED that haven't been followed by APPROVED
-          reviews=$(gh pr view "$pr_number" --repo "$repo" --json reviews -q '
+          # ── Condition 3: No reviewer has CHANGES_REQUESTED as latest state ──
+          # Secondary signal for human reviewers who submit top-level
+          # CHANGES_REQUESTED without inline threads.
+          changes_requested=$(gh pr view "$PR_NUMBER" --repo "$repo" --json reviews -q '
             [.reviews[] | select(.state == "CHANGES_REQUESTED" or .state == "APPROVED")] |
             group_by(.author.login) |
             map(last) |
             map(select(.state == "CHANGES_REQUESTED")) |
             length' 2>/dev/null || echo "0")
 
-          has_unresolved_reviews=$([ "$reviews" -gt 0 ] && echo true || echo false)
+          no_changes_requested=$([ "$changes_requested" -eq 0 ] && echo true || echo false)
 
-          # Determine target state
-          if [ "$ci_ok" = "true" ] && [ "$has_unresolved_reviews" = "false" ]; then
+          # ── Determine target state ──
+          # pr-ready requires ALL three conditions
+          if [ "$has_any_review" = "true" ] && \
+             [ "$no_unresolved_threads" = "true" ] && \
+             [ "$no_changes_requested" = "true" ]; then
             target="ready"
           else
             target="in-progress"
           fi
 
-          echo "ci_ok=${ci_ok}" >> "$GITHUB_OUTPUT"
-          echo "ci_pending=${ci_pending}" >> "$GITHUB_OUTPUT"
-          echo "has_unresolved_reviews=${has_unresolved_reviews}" >> "$GITHUB_OUTPUT"
+          echo "has_any_review=${has_any_review}" >> "$GITHUB_OUTPUT"
+          echo "unresolved_threads=${unresolved_threads}" >> "$GITHUB_OUTPUT"
+          echo "no_unresolved_threads=${no_unresolved_threads}" >> "$GITHUB_OUTPUT"
+          echo "no_changes_requested=${no_changes_requested}" >> "$GITHUB_OUTPUT"
           echo "target=${target}" >> "$GITHUB_OUTPUT"
+
+          echo "Review status: has_review=${has_any_review} unresolved=${unresolved_threads} changes_requested=$((changes_requested)) -> target=${target}"
 
       - name: Swap to devin:pr-ready
         if: >-
