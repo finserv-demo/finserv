@@ -1,7 +1,13 @@
 name: Handle Devin PR Closed Without Merge
 
 on:
-  pull_request:
+  # Use pull_request_target instead of pull_request because PRs created by
+  # GitHub Apps (like devin-ai-integration[bot]) do not trigger pull_request
+  # events.  pull_request_target runs in the base-branch context and fires
+  # for bot-authored PRs.  This is safe here because we never checkout or
+  # execute code from the PR branch — we only read PR metadata via GraphQL
+  # and modify issues.
+  pull_request_target:
     types: [closed]
 
 jobs:
