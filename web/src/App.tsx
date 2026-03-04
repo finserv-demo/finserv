@@ -26,7 +26,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1 className="logo">FinServ</h1>
+          <h1 className="logo">FinServe</h1>
           <span className="tagline">UK Robo-Advisor</span>
         </div>
         <nav className="nav-tabs">
@@ -57,7 +57,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>FinServ Ltd — Authorised and regulated by the FCA (demo)</p>
+        <p>FinServe Ltd — Authorised and regulated by the FCA (demo)</p>
       </footer>
     </div>
   )

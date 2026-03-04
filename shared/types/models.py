@@ -1,4 +1,4 @@
-"""Shared Pydantic models used across all FinServ services."""
+"""Shared Pydantic models used across all FinServe services."""
 
 from datetime import date, datetime
 from enum import Enum

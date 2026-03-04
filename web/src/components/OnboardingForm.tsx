@@ -138,7 +138,7 @@ function OnboardingForm() {
     <div className="card">
       <h2 className="card-title">Open an Account</h2>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-        Complete the form below to start your investment journey with FinServ.
+        Complete the form below to start your investment journey with FinServe.
       </p>
 
       <form onSubmit={handleSubmit}>
