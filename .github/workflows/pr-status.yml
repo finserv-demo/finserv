@@ -110,12 +110,16 @@ jobs:
               [ "$name" = "sync-pr-label" ] && continue
 
               case "$status" in
-                pass|"") ;;  # passed or no status
-                fail)
+                pass|skipping|"") ;;  # passed, skipped, or no status
+                fail|cancel)
                   ci_ok=false
                   ;;
                 pending)
                   ci_pending=true
+                  ci_ok=false
+                  ;;
+                *)
+                  # Unknown status — treat as not passing
                   ci_ok=false
                   ;;
               esac
