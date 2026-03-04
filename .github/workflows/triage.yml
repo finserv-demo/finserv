@@ -119,10 +119,10 @@ jobs:
             -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
             --data-urlencode "limit=100")
 
-          # Check for any active session (status: running, new, claimed, resuming)
+          # Check for any active session (status: running, new, claimed, resuming, suspended)
           active_url=$(echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
-              ["running","new","claimed","resuming"] | index($s))] |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
             first | .url // empty')
 
           if [ -n "$active_url" ]; then
@@ -252,7 +252,7 @@ jobs:
 
           session_id=$(echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
-              ["running","new","claimed","resuming"] | index($s))] |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
             first | .session_id // empty')
 
           if [ -n "$session_id" ]; then

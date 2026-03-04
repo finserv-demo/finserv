@@ -57,7 +57,7 @@ jobs:
 
           active_id=$(echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
-              ["running","new","claimed","resuming"] | index($s))] |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
             first | .session_id // empty')
 
           if [ -n "$active_id" ]; then
@@ -140,7 +140,7 @@ jobs:
 
           session_id=$(echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
-              ["running","new","claimed","resuming"] | index($s))] |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
             first | .session_id // empty')
 
           if [ -n "$session_id" ]; then
