@@ -28,7 +28,7 @@ jobs:
           echo "found=true" >> "$GITHUB_OUTPUT"
           echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
 
-      - name: Check issue has devin:pr-opened label
+      - name: Check issue has a devin PR label
         if: steps.extract.outputs.found == 'true'
         id: check
         env:
@@ -40,10 +40,19 @@ jobs:
           labels=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
             --json labels -q '.labels[].name' 2>/dev/null || true)
 
-          if echo "$labels" | grep -q "^devin:pr-opened$"; then
+          # Check for either PR state label (pr-in-progress or pr-ready)
+          pr_label=""
+          if echo "$labels" | grep -q "^devin:pr-in-progress$"; then
+            pr_label="devin:pr-in-progress"
+          elif echo "$labels" | grep -q "^devin:pr-ready$"; then
+            pr_label="devin:pr-ready"
+          fi
+
+          if [ -n "$pr_label" ]; then
             echo "has_label=true" >> "$GITHUB_OUTPUT"
+            echo "pr_label=$pr_label" >> "$GITHUB_OUTPUT"
           else
-            echo "Issue #$ISSUE_NUMBER does not have devin:pr-opened label, skipping"
+            echo "Issue #$ISSUE_NUMBER does not have a devin PR label, skipping"
             echo "has_label=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -52,14 +61,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ISSUES_REPO_TOKEN }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          PR_LABEL: ${{ steps.check.outputs.pr_label }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           REPO="finserv-demo/devin-issue-tackler"
 
-          # Swap labels: devin:pr-opened → devin:triaged
+          # Swap labels: current PR label → devin:triaged
           gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
-            --remove-label "devin:pr-opened" \
+            --remove-label "$PR_LABEL" \
             --add-label "devin:triaged"
 
           # Post comment explaining what happened
@@ -77,16 +87,18 @@ jobs:
             "https://api.devin.ai/v1/sessions?tags=backlog-auto,issue:${ISSUE_NUMBER}&limit=10" \
             2>/dev/null || echo '{"sessions":[]}')
 
-          # Extract active session IDs (status: working/running/new/claimed/resuming)
+          # Extract active session IDs
+          # v1 API returns both 'status' (v3-style: running, new, claimed, resuming)
+          # and 'status_enum' (v1-native: working, blocked). Check both fields.
           session_ids=$(echo "$response" | jq -r '
             .sessions[]
             | select(
-                .status_enum == "working" or
-                .status_enum == "blocked" or
                 .status == "running" or
                 .status == "new" or
                 .status == "claimed" or
-                .status == "resuming"
+                .status == "resuming" or
+                .status_enum == "working" or
+                .status_enum == "blocked"
               )
             | .session_id
           ' 2>/dev/null || true)

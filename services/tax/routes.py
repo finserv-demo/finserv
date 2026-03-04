@@ -3,28 +3,26 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.tax.isa import (
-    get_isa_summary,
-    validate_isa_contribution,
-    record_isa_contribution,
-    get_remaining_allowance,
-    get_current_tax_year,
-    init_isa_data,
-)
 from services.tax.cgt import (
     calculate_annual_cgt,
-    record_disposal,
-    get_cgt_summary,
     check_bed_and_breakfast,
+    get_cgt_summary,
     init_cgt_data,
+    record_disposal,
+)
+from services.tax.isa import (
+    get_current_tax_year,
+    get_isa_summary,
+    get_remaining_allowance,
+    init_isa_data,
+    record_isa_contribution,
+    validate_isa_contribution,
 )
 from services.tax.tax_loss_harvesting import (
     identify_harvesting_opportunities,
-    calculate_harvesting_benefit,
-    create_harvesting_plan,
 )
 
 router = APIRouter()
