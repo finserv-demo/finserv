@@ -9,7 +9,7 @@ from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # BUG: secret key hardcoded in source — should be from env
-SECRET_KEY = "finserve-super-secret-key-change-me-in-production"
+SECRET_KEY = "finserv-super-secret-key-change-me-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
