@@ -16,7 +16,6 @@ from automation.devin_api import (  # noqa: E402
     _extract_label_names,
     _format_comments,
     _parse_labels,
-    build_followup_prompt,
     build_implement_prompt,
     build_triage_prompt,
     cmd_check_active_session,
@@ -538,12 +537,12 @@ async def test_cmd_forward_comment_with_body_arg(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.asyncio
-async def test_cmd_forward_comment_no_session_no_labels(
+async def test_cmd_forward_comment_no_sessions_exist(
     tmp_path: Path,
     github_output_file: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When no active session and no qualifying labels, comment is dropped."""
+    """When no sessions exist for the issue at all, comment is dropped."""
     monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
     monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
     monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
@@ -553,39 +552,8 @@ async def test_cmd_forward_comment_no_session_no_labels(
 
     mock_client = AsyncMock()
     mock_client.get_active_session_for_issue.return_value = None
+    mock_client.get_most_recent_session_for_issue.return_value = None
 
-    args = FakeArgs(
-        issue=42, author="octocat", body=None, body_file=str(body_file),
-        repo="finserv-demo/finserv", labels="bug,enhancement", context_file=None,
-    )
-
-    with patch("automation.devin_api.get_devin_client", return_value=mock_client):
-        await cmd_forward_comment(args)
-
-    mock_client.send_message.assert_not_called()
-    mock_client.create_session.assert_not_called()
-    output_content = github_output_file.read_text()
-    assert "comment_handled=dropped" in output_content
-
-
-@pytest.mark.asyncio
-async def test_cmd_forward_comment_no_session_no_labels_attr(
-    tmp_path: Path,
-    github_output_file: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When no active session and labels arg is missing entirely, comment is dropped."""
-    monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
-    monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
-    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
-
-    body_file = tmp_path / "body.txt"
-    body_file.write_text("Hello")
-
-    mock_client = AsyncMock()
-    mock_client.get_active_session_for_issue.return_value = None
-
-    # Simulate old-style args without labels/repo/context_file
     args = FakeArgs(issue=42, author="octocat", body=None, body_file=str(body_file))
 
     with patch("automation.devin_api.get_devin_client", return_value=mock_client):
@@ -598,197 +566,73 @@ async def test_cmd_forward_comment_no_session_no_labels_attr(
 
 
 @pytest.mark.asyncio
-async def test_cmd_forward_comment_creates_followup_session(
+async def test_cmd_forward_comment_messages_most_recent_session(
     tmp_path: Path,
     github_output_file: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When no active session but issue has devin:triaged label, create follow-up session."""
+    """When no active session exists, forward to the most recent session."""
     monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
     monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
-    monkeypatch.setenv("TRIAGE_PLAYBOOK_ID", "pb-triage-001")
-    monkeypatch.setenv("ACU_LIMIT_TRIAGE", "8")
     monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
 
     body_file = tmp_path / "body.txt"
     body_file.write_text("Can you also look at the CSS?")
 
-    context = {
-        "title": "Fix login bug",
-        "body": "Login page is broken.",
-        "comments": [
-            {"author": {"login": "devin-ai-integration[bot]"}, "body": "## Triage\nSmall fix."},
-            # The last comment is the triggering comment and should be excluded
-            # from "Prior Comments" (it is passed separately as the new comment).
-            {"author": {"login": "emily-ross"}, "body": "Can you also look at the CSS?"},
-        ],
-    }
-    context_file = tmp_path / "context.json"
-    context_file.write_text(json.dumps(context))
-
-    new_session = DevinSession(
-        session_id="sess-followup-001",
-        url="https://app.devin.ai/sessions/sess-followup-001",
-        status="new",
+    recent_session = DevinSession(
+        session_id="sess-recent-001",
+        url="https://app.devin.ai/sessions/sess-recent-001",
+        status="exit",
     )
     mock_client = AsyncMock()
     mock_client.get_active_session_for_issue.return_value = None
-    mock_client.create_session.return_value = new_session
+    mock_client.get_most_recent_session_for_issue.return_value = recent_session
 
-    args = FakeArgs(
-        issue=42, author="emily-ross", body=None, body_file=str(body_file),
-        repo="finserv-demo/finserv", labels="bug,devin:triaged",
-        context_file=str(context_file),
-    )
+    args = FakeArgs(issue=42, author="emily-ross", body=None, body_file=str(body_file))
 
     with patch("automation.devin_api.get_devin_client", return_value=mock_client):
         await cmd_forward_comment(args)
 
-    mock_client.send_message.assert_not_called()
-    mock_client.create_session.assert_called_once()
-
-    call_kwargs = mock_client.create_session.call_args
-    assert call_kwargs.kwargs["playbook_id"] == "pb-triage-001"
-    assert call_kwargs.kwargs["max_acu_limit"] == 8
-    assert "stage:followup" in call_kwargs.kwargs["tags"]
-    assert "issue:42" in call_kwargs.kwargs["tags"]
-    prompt = call_kwargs.kwargs["prompt"]
-    assert "Continue the conversation" in prompt
-    assert "@emily-ross" in prompt
-    assert "Can you also look at the CSS?" in prompt
-    assert "Fix login bug" in prompt
-    assert "Triage" in prompt
+    # Should message the most recent session, not create a new one
+    mock_client.send_message.assert_called_once()
+    call_args = mock_client.send_message.call_args[0]
+    assert call_args[0] == "sess-recent-001"
+    assert "@emily-ross" in call_args[1]
+    assert "Can you also look at the CSS?" in call_args[1]
+    mock_client.create_session.assert_not_called()
 
     output_content = github_output_file.read_text()
-    assert "comment_handled=resumed" in output_content
-    assert "session_id=sess-followup-001" in output_content
+    assert "comment_handled=forwarded" in output_content
 
 
 @pytest.mark.asyncio
-async def test_cmd_forward_comment_followup_with_triage_label(
+async def test_cmd_forward_comment_message_recent_session_fails(
     tmp_path: Path,
     github_output_file: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """devin:triage label also qualifies for follow-up session."""
+    """When messaging the most recent session fails, comment is dropped."""
     monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
     monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
     monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
 
-    new_session = DevinSession(session_id="sess-fu", url="https://app.devin.ai/sessions/sess-fu", status="new")
+    recent_session = DevinSession(
+        session_id="sess-dead",
+        url="https://app.devin.ai/sessions/sess-dead",
+        status="exit",
+    )
     mock_client = AsyncMock()
     mock_client.get_active_session_for_issue.return_value = None
-    mock_client.create_session.return_value = new_session
+    mock_client.get_most_recent_session_for_issue.return_value = recent_session
+    mock_client.send_message.side_effect = RuntimeError("Session terminated")
 
-    args = FakeArgs(
-        issue=10, author="octocat", body="question?", body_file=None,
-        repo="org/repo", labels="devin:triage", context_file=None,
-    )
-
-    with patch("automation.devin_api.get_devin_client", return_value=mock_client):
-        await cmd_forward_comment(args)
-
-    mock_client.create_session.assert_called_once()
-    output_content = github_output_file.read_text()
-    assert "comment_handled=resumed" in output_content
-
-
-@pytest.mark.asyncio
-async def test_cmd_forward_comment_followup_creation_failure(
-    tmp_path: Path,
-    github_output_file: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When follow-up session creation fails, error is reported."""
-    monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
-    monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
-    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
-
-    mock_client = AsyncMock()
-    mock_client.get_active_session_for_issue.return_value = None
-    mock_client.create_session.side_effect = RuntimeError("API error")
-
-    args = FakeArgs(
-        issue=42, author="octocat", body="help", body_file=None,
-        repo="org/repo", labels="devin:triaged", context_file=None,
-    )
+    args = FakeArgs(issue=42, author="octocat", body="help", body_file=None)
 
     with patch("automation.devin_api.get_devin_client", return_value=mock_client):
         await cmd_forward_comment(args)  # should not raise
 
     output_content = github_output_file.read_text()
-    assert "comment_handled=error" in output_content
-    assert "session_error=API error" in output_content
-
-
-@pytest.mark.asyncio
-async def test_cmd_forward_comment_no_repo_drops(
-    tmp_path: Path,
-    github_output_file: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When labels qualify but --repo is missing, comment is dropped."""
-    monkeypatch.setenv("DEVIN_API_KEY", "cog_test")
-    monkeypatch.setenv("DEVIN_ORG_ID", "org-test")
-    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output_file))
-
-    mock_client = AsyncMock()
-    mock_client.get_active_session_for_issue.return_value = None
-
-    args = FakeArgs(
-        issue=42, author="octocat", body="hello", body_file=None,
-        repo=None, labels="devin:triaged", context_file=None,
-    )
-
-    with patch("automation.devin_api.get_devin_client", return_value=mock_client):
-        await cmd_forward_comment(args)
-
-    mock_client.create_session.assert_not_called()
-    output_content = github_output_file.read_text()
     assert "comment_handled=dropped" in output_content
-
-
-# -- build_followup_prompt --
-
-
-def test_build_followup_prompt_basic() -> None:
-    prompt = build_followup_prompt(
-        issue_number=42,
-        repo="finserv-demo/finserv",
-        author="emily-ross",
-        comment_body="Can you also look at the CSS?",
-        issue_title="Fix login bug",
-        issue_body="Login page is broken.",
-        prior_comments="### Comment by @devin-ai-integration[bot]\nTriage analysis here.",
-    )
-
-    assert "Continue the conversation" in prompt
-    assert "#42" in prompt
-    assert "finserv-demo/finserv" in prompt
-    assert "@emily-ross" in prompt
-    assert "Can you also look at the CSS?" in prompt
-    assert "Fix login bug" in prompt
-    assert "Login page is broken." in prompt
-    assert "Prior Comments" in prompt
-    assert "Triage analysis here" in prompt
-    assert "Please respond to @emily-ross" in prompt
-
-
-def test_build_followup_prompt_no_prior_comments() -> None:
-    prompt = build_followup_prompt(
-        issue_number=10,
-        repo="org/repo",
-        author="octocat",
-        comment_body="Question",
-        issue_title="Title",
-        issue_body="Body",
-        prior_comments="",
-    )
-
-    assert "Continue the conversation" in prompt
-    assert "Prior Comments" not in prompt
-    assert "@octocat" in prompt
-    assert "Question" in prompt
 
 
 # -- _parse_labels --

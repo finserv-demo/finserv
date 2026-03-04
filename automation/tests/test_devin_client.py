@@ -220,6 +220,55 @@ async def test_get_active_session_none(client: DevinClient, httpx_mock: HTTPXMoc
     assert active is None
 
 
+# -- get_most_recent_session_for_issue --
+
+
+@pytest.mark.asyncio
+async def test_get_most_recent_session(client: DevinClient, httpx_mock: HTTPXMock) -> None:
+    """Returns the session with the latest created_at, regardless of status."""
+    httpx_mock.add_response(
+        url=httpx.URL(
+            f"{V1_BASE}/sessions",
+            params={"tags": "backlog-auto,issue:42", "limit": "100"},
+        ),
+        json={
+            "sessions": [
+                {
+                    "session_id": "devin-older",
+                    "status": "exit",
+                    "created_at": "2026-03-01T00:00:00Z",
+                    "tags": ["backlog-auto", "issue:42"],
+                },
+                {
+                    "session_id": "devin-newer",
+                    "status": "exit",
+                    "created_at": "2026-03-02T00:00:00Z",
+                    "tags": ["backlog-auto", "issue:42"],
+                },
+            ],
+        },
+    )
+
+    recent = await client.get_most_recent_session_for_issue(42)
+    assert recent is not None
+    assert recent.session_id == "newer"
+
+
+@pytest.mark.asyncio
+async def test_get_most_recent_session_none(client: DevinClient, httpx_mock: HTTPXMock) -> None:
+    """Returns None when no sessions exist for the issue."""
+    httpx_mock.add_response(
+        url=httpx.URL(
+            f"{V1_BASE}/sessions",
+            params={"tags": "backlog-auto,issue:42", "limit": "100"},
+        ),
+        json={"sessions": []},
+    )
+
+    recent = await client.get_most_recent_session_for_issue(42)
+    assert recent is None
+
+
 # -- Message polling --
 
 
