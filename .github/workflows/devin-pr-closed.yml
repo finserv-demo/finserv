@@ -102,6 +102,7 @@ jobs:
                 .status == "new" or
                 .status == "claimed" or
                 .status == "resuming" or
+                .status == "suspended" or
                 .status_enum == "working" or
                 .status_enum == "blocked"
               )
