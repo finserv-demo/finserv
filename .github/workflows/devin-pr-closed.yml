@@ -83,8 +83,13 @@ jobs:
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
         run: |
           # Find active sessions for this issue via Devin API
-          response=$(curl -sf -H "Authorization: Bearer $DEVIN_API_KEY" \
-            "https://api.devin.ai/v1/sessions?tags=backlog-auto,issue:${ISSUE_NUMBER}&limit=10" \
+          # Tags must be passed as separate repeated params (matching existing callers)
+          response=$(curl -sf \
+            -X GET "https://api.devin.ai/v1/sessions" \
+            -H "Authorization: Bearer $DEVIN_API_KEY" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${ISSUE_NUMBER}" \
+            --data-urlencode "limit=10" \
             2>/dev/null || echo '{"sessions":[]}')
 
           # Extract active session IDs
