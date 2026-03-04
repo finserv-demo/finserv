@@ -184,8 +184,10 @@ jobs:
 
             title=$(echo "$context" | jq -r '.title // ""' | head -c 500)
             body=$(echo "$context" | jq -r '.body // ""' | head -c 5000)
+            # Exclude the last comment (the triggering comment) since it is
+            # already included separately in the "New Follow-up Comment" section.
             comments=$(echo "$context" | jq -r '
-              .comments[] |
+              .comments[:-1][] |
               "### Comment by @\(.author.login)\n\(.body)\n"' 2>/dev/null || echo "")
 
             prompt="Continue the conversation on GitHub issue #${issue} on ${repo}.

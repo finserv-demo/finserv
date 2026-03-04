@@ -618,6 +618,9 @@ async def test_cmd_forward_comment_creates_followup_session(
         "body": "Login page is broken.",
         "comments": [
             {"author": {"login": "devin-ai-integration[bot]"}, "body": "## Triage\nSmall fix."},
+            # The last comment is the triggering comment and should be excluded
+            # from "Prior Comments" (it is passed separately as the new comment).
+            {"author": {"login": "emily-ross"}, "body": "Can you also look at the CSS?"},
         ],
     }
     context_file = tmp_path / "context.json"

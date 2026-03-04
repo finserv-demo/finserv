@@ -333,7 +333,10 @@ async def cmd_forward_comment(args: argparse.Namespace) -> None:
             context = json.load(f)
         issue_title = context.get("title", "")
         issue_body = context.get("body", "") or ""
-        prior_comments = _format_comments(context.get("comments", []))
+        # Exclude the last comment — it is the triggering comment which is
+        # already included in the "New Follow-up Comment" section of the prompt.
+        all_comments = context.get("comments", [])
+        prior_comments = _format_comments(all_comments[:-1] if all_comments else [])
     else:
         issue_title = ""
         issue_body = ""
