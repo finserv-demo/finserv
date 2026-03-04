@@ -210,7 +210,7 @@ class DevinClient:
         sessions = await self.get_sessions_for_issue(issue_number)
         if not sessions:
             return None
-        return max(sessions, key=lambda s: s.created_at)
+        return max(sessions, key=lambda s: s.created_at if isinstance(s.created_at, str) else "")
 
     # ── Message polling ──
 
