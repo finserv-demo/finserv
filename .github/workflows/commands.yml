@@ -52,7 +52,8 @@ jobs:
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
           active_id=$(echo "$response" | jq -r '
@@ -149,7 +150,8 @@ jobs:
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
           total=$(echo "$response" | jq '[.sessions[]] | length')
