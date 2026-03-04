@@ -91,8 +91,9 @@ Re-read everything. Make sure you understand the full scope before writing code.
    - Address legitimate bot feedback
    - Use judgement on stylistic suggestions
 
-5. If actionable feedback: fix, push, wait for CI again. Repeat (up to 3 total fix
-   cycles for CI/review failures).
+5. If actionable feedback: fix, push, wait for CI again. Repeat as needed, but
+   track total fix attempts across the entire PR lifecycle. If you reach 5 total
+   fix attempts without converging, escalate (see step 8).
 
 6. **CRITICAL — Label Transition (pr-in-progress -> pr-ready):**
    Once ALL of the following are true:
