@@ -1,22 +1,23 @@
 """FastAPI routes for the onboarding service."""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from typing import Optional
 
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from services.onboarding.kyc import (
-    submit_application,
     get_application,
     get_applications_for_user,
-    update_kyc_status,
-    verify_identity,
     get_onboarding_stats,
     init_onboarding_data,
+    submit_application,
+    update_kyc_status,
+    verify_identity,
 )
 from services.onboarding.validators import (
     validate_ni_number,
-    validate_postcode,
     validate_phone,
+    validate_postcode,
 )
 
 router = APIRouter()

@@ -1,14 +1,15 @@
 """Risk Engine service — risk profiling and questionnaire management."""
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from services.risk_engine.routes import router
 from services.risk_engine.db import init_db
+from services.risk_engine.routes import router
 
 app = FastAPI(
     title="FinServ Risk Engine",
