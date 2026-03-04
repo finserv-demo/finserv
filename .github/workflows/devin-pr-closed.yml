@@ -9,18 +9,37 @@ jobs:
     # Only act when PR was closed WITHOUT merging
     if: github.event.pull_request.merged == false
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
     steps:
-      - name: Extract issue number from PR body
+      - name: Extract linked issue number
         id: extract
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Look for cross-repo issue URL in PR body:
-          # https://github.com/finserv-demo/devin-issue-tackler/issues/N
-          issue_number=$(echo "$PR_BODY" | grep -oP 'finserv-demo/devin-issue-tackler/issues/\K\d+' | head -1)
+          pr_number=${{ github.event.pull_request.number }}
+          repo=${{ github.repository }}
+          owner="${repo%%/*}"
+          name="${repo##*/}"
+
+          # Use GraphQL closingIssuesReferences to get issues from the
+          # "Development" sidebar — the source of truth GitHub uses for
+          # auto-closing on merge.
+          issue_number=$(gh api graphql -f query='
+            query($owner: String!, $name: String!, $pr: Int!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  closingIssuesReferences(first: 1) {
+                    nodes { number }
+                  }
+                }
+              }
+            }' -f owner="$owner" -f name="$name" -F pr="$pr_number" \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[0].number // empty' 2>/dev/null || true)
 
           if [ -z "$issue_number" ]; then
-            echo "No devin-issue-tackler issue reference found in PR body, skipping"
+            echo "No linked issue found in PR #${pr_number}, skipping"
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -32,15 +51,15 @@ jobs:
         if: steps.extract.outputs.found == 'true'
         id: check
         env:
-          GH_TOKEN: ${{ secrets.ISSUES_REPO_TOKEN }}
-          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPO="finserv-demo/devin-issue-tackler"
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
 
-          labels=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
+          labels=$(gh issue view "$issue" --repo "$repo" \
             --json labels -q '.labels[].name' 2>/dev/null || true)
 
-          # Check for either PR state label (pr-in-progress or pr-ready)
+          # Check for either PR state label
           pr_label=""
           if echo "$labels" | grep -q "^devin:pr-in-progress$"; then
             pr_label="devin:pr-in-progress"
@@ -52,72 +71,58 @@ jobs:
             echo "has_label=true" >> "$GITHUB_OUTPUT"
             echo "pr_label=$pr_label" >> "$GITHUB_OUTPUT"
           else
-            echo "Issue #$ISSUE_NUMBER does not have a devin PR label, skipping"
+            echo "Issue #${issue} does not have a devin PR label, skipping"
             echo "has_label=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Transition issue back to triaged
         if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
         env:
-          GH_TOKEN: ${{ secrets.ISSUES_REPO_TOKEN }}
-          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
-          PR_LABEL: ${{ steps.check.outputs.pr_label }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          REPO="finserv-demo/devin-issue-tackler"
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
+          pr_label="${{ steps.check.outputs.pr_label }}"
 
           # Swap labels: current PR label → devin:triaged
-          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
-            --remove-label "$PR_LABEL" \
+          gh issue edit "$issue" --repo "$repo" \
+            --remove-label "$pr_label" \
             --add-label "devin:triaged"
 
           # Post comment explaining what happened
-          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+          gh issue comment "$issue" --repo "$repo" \
             --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can retry implementation with \`/proceed\` or retriage with \`/retriage\`."
 
       - name: Terminate active Devin session
         if: always() && steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
-          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
         run: |
-          # Find active sessions for this issue via Devin API
-          # Tags must be passed as separate repeated params (matching existing callers)
-          response=$(curl -sf \
-            -X GET "https://api.devin.ai/v1/sessions" \
-            -H "Authorization: Bearer $DEVIN_API_KEY" \
-            -G --data-urlencode "tags=backlog-auto" \
-            --data-urlencode "tags=issue:${ISSUE_NUMBER}" \
-            --data-urlencode "limit=10" \
-            2>/dev/null || echo '{"sessions":[]}')
+          issue=${{ steps.extract.outputs.issue_number }}
 
-          # Extract active session IDs
-          # v1 API returns both 'status' (v3-style: running, new, claimed, resuming)
-          # and 'status_enum' (v1-native: working, blocked). Check both fields.
+          # Find active sessions (matching triage.yml pattern)
+          response=$(curl -s \
+            -X GET "https://api.devin.ai/v1/sessions" \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
+            --data-urlencode "limit=100")
+
           session_ids=$(echo "$response" | jq -r '
-            .sessions[]
-            | select(
-                .status == "running" or
-                .status == "new" or
-                .status == "claimed" or
-                .status == "resuming" or
-                .status == "suspended" or
-                .status_enum == "working" or
-                .status_enum == "blocked"
-              )
-            | .session_id
-          ' 2>/dev/null || true)
+            [.sessions[] | select(.status as $s |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
+            .[] | .session_id' 2>/dev/null || true)
 
           if [ -z "$session_ids" ]; then
-            echo "No active Devin sessions found for issue #$ISSUE_NUMBER"
+            echo "No active Devin sessions found for issue #${issue}"
             exit 0
           fi
 
           # Terminate each active session
           for sid in $session_ids; do
             echo "Terminating session $sid..."
-            curl -sf -X DELETE \
-              -H "Authorization: Bearer $DEVIN_API_KEY" \
-              "https://api.devin.ai/v1/sessions/${sid}" 2>/dev/null || true
+            curl -s -X DELETE "https://api.devin.ai/v1/sessions/${sid}" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
           done
