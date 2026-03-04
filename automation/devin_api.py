@@ -260,7 +260,18 @@ async def cmd_forward_comment(args: argparse.Namespace) -> None:
     session = await client.get_active_session_for_issue(args.issue)
 
     if session:
-        await client.send_message(session.session_id, message)
+        try:
+            await client.send_message(session.session_id, message)
+        except Exception as exc:
+            logger.warning(
+                "Could not message active session %s for issue #%d (status=%s): %s — comment dropped",
+                session.session_id,
+                args.issue,
+                session.status,
+                exc,
+            )
+            _write_github_output("comment_handled", "dropped")
+            return
         logger.info("Forwarded comment from @%s to active session %s", args.author, session.session_id)
         _write_github_output("comment_handled", "forwarded")
         return
