@@ -28,10 +28,6 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 
-# Labels that qualify an issue for follow-up session resumption.
-# If the issue carries any of these labels, a new session will be created
-# when a comment arrives and no active session exists.
-_RESUMABLE_LABELS = {"devin:triage", "devin:triaged"}
 
 
 def get_devin_client() -> DevinClient:
@@ -135,54 +131,6 @@ def _format_comments(comments: list) -> str:
     return "\n".join(parts)
 
 
-def build_followup_prompt(
-    issue_number: int,
-    repo: str,
-    author: str,
-    comment_body: str,
-    issue_title: str,
-    issue_body: str,
-    prior_comments: str,
-) -> str:
-    """Build a prompt for a follow-up session on a previously triaged issue.
-
-    This is used when a user comments on an issue whose triage session has
-    already completed.  A new Devin session is started with the full issue
-    context so that Devin can continue the conversation.
-
-    Args:
-        issue_number: The GitHub issue number.
-        repo: Repository in owner/repo format.
-        author: The GitHub username of the commenter.
-        comment_body: The text of the new comment.
-        issue_title: The issue title.
-        issue_body: The issue body.
-        prior_comments: Pre-formatted string of previous comments on the issue.
-
-    Returns:
-        Formatted prompt string for the follow-up session.
-    """
-    prompt = (
-        f"Continue the conversation on GitHub issue #{issue_number} on {repo}.\n\n"
-        f"A user has posted a follow-up comment after the initial triage was completed. "
-        f"Review the issue context and prior comments (which include the triage analysis), "
-        f"then respond to the new comment.\n\n"
-        f"## Issue #{issue_number}: {issue_title}\n\n"
-        f"{issue_body}\n\n"
-        f"**Repository:** {repo}\n"
-        f"**Issue URL:** https://github.com/{repo}/issues/{issue_number}"
-    )
-
-    if prior_comments:
-        prompt += f"\n\n## Prior Comments (includes triage analysis)\n{prior_comments}"
-
-    prompt += (
-        f"\n\n## New Follow-up Comment from @{author}\n"
-        f"{comment_body}\n\n"
-        f"Please respond to @{author}'s comment on the issue."
-    )
-
-    return prompt
 
 
 def _write_github_output(key: str, value: str) -> None:
@@ -282,11 +230,18 @@ async def cmd_terminate_active(args: argparse.Namespace) -> None:
 
 
 async def cmd_forward_comment(args: argparse.Namespace) -> None:
-    """Forward a GitHub comment to the active Devin session for an issue.
+    """Forward a GitHub comment to the most relevant Devin session for an issue.
 
-    If no active session exists but the issue has a qualifying label
-    (devin:triage or devin:triaged), a new follow-up session is created
-    with full issue context so that Devin can continue the conversation.
+    Strategy (Option A — "message first, create never"):
+    1. If an *active* session exists, forward the message to it.
+    2. Otherwise, find the *most recently created* session (any status) and
+       attempt to message it.  ``POST /sessions/{id}/message`` auto-resumes
+       suspended sessions.
+    3. If messaging fails (session truly terminated) or no sessions exist at
+       all, the comment is dropped with a log warning.
+
+    This avoids creating duplicate follow-up sessions which previously raced
+    against each other and posted duplicate comments on issues.
     """
     client = get_devin_client()
 
@@ -299,97 +254,58 @@ async def cmd_forward_comment(args: argparse.Namespace) -> None:
         logger.error("Either --body or --body-file is required")
         sys.exit(1)
 
+    message = f"New comment from @{args.author} on GitHub issue #{args.issue}:\n\n{body}"
+
+    # 1. Try the active session first.
     session = await client.get_active_session_for_issue(args.issue)
 
     if session:
-        message = f"New comment from @{args.author} on GitHub issue #{args.issue}:\n\n{body}"
-        await client.send_message(session.session_id, message)
-        logger.info("Forwarded comment from @%s to session %s", args.author, session.session_id)
+        try:
+            await client.send_message(session.session_id, message)
+        except Exception as exc:
+            logger.warning(
+                "Could not message active session %s for issue #%d (status=%s): %s — comment dropped",
+                session.session_id,
+                args.issue,
+                session.status,
+                exc,
+            )
+            _write_github_output("comment_handled", "dropped")
+            return
+        logger.info("Forwarded comment from @%s to active session %s", args.author, session.session_id)
         _write_github_output("comment_handled", "forwarded")
         return
 
-    # No active session — check if the issue qualifies for a follow-up session.
-    labels = _parse_labels(args.labels) if getattr(args, "labels", None) else set()
-    repo = getattr(args, "repo", "") or ""
+    logger.info("No active session for issue #%d — looking for most recent session", args.issue)
 
-    if not labels & _RESUMABLE_LABELS:
-        logger.info(
-            "No active session for issue #%d and no qualifying labels (%s), comment not forwarded",
-            args.issue,
-            ", ".join(sorted(labels)) if labels else "none provided",
-        )
+    # 2. Try the most recent session (any status).
+    recent = await client.get_most_recent_session_for_issue(args.issue)
+
+    if recent is None:
+        logger.warning("No sessions exist for issue #%d, comment not forwarded", args.issue)
         _write_github_output("comment_handled", "dropped")
         return
-
-    if not repo:
-        logger.error("--repo is required to create a follow-up session")
-        _write_github_output("comment_handled", "dropped")
-        return
-
-    # Build context for the follow-up session.
-    context_file = getattr(args, "context_file", None)
-    if context_file:
-        with open(context_file) as f:
-            context = json.load(f)
-        issue_title = context.get("title", "")
-        issue_body = context.get("body", "") or ""
-        # Exclude the last comment — it is the triggering comment which is
-        # already included in the "New Follow-up Comment" section of the prompt.
-        all_comments = context.get("comments", [])
-        prior_comments = _format_comments(all_comments[:-1] if all_comments else [])
-    else:
-        issue_title = ""
-        issue_body = ""
-        prior_comments = ""
-
-    prompt = build_followup_prompt(
-        issue_number=args.issue,
-        repo=repo,
-        author=args.author,
-        comment_body=body,
-        issue_title=issue_title,
-        issue_body=issue_body,
-        prior_comments=prior_comments,
-    )
-
-    playbook_id = os.environ.get("TRIAGE_PLAYBOOK_ID", "") or None
-    # Default must match the workflow fallback in commands.yml (currently 25).
-    acu_limit = int(os.environ.get("ACU_LIMIT_TRIAGE", "25"))
-
-    # NOTE: The production path for follow-up session creation is the inline
-    # bash in .github/workflows/commands.yml (lines ~164-243).  This Python
-    # implementation mirrors it for CLI/test use.  Keep both in sync.
-    tags = [
-        "backlog-auto",
-        f"issue:{args.issue}",
-        "stage:followup",
-        f"repo:{repo}",
-    ]
 
     try:
-        new_session = await client.create_session(
-            prompt=prompt,
-            playbook_id=playbook_id,
-            tags=tags,
-            max_acu_limit=acu_limit,
-        )
+        await client.send_message(recent.session_id, message)
     except Exception as exc:
-        logger.error(
-            "Failed to create follow-up session for issue #%d: %s", args.issue, exc,
+        logger.warning(
+            "Could not message most recent session %s for issue #%d (status=%s): %s — comment dropped",
+            recent.session_id,
+            args.issue,
+            recent.status,
+            exc,
         )
-        _write_github_output("comment_handled", "error")
-        _write_github_output("session_error", str(exc))
+        _write_github_output("comment_handled", "dropped")
         return
 
     logger.info(
-        "Created follow-up session %s for issue #%d: %s",
-        new_session.session_id,
-        args.issue,
-        new_session.url,
+        "Forwarded comment from @%s to most recent session %s (status was %s)",
+        args.author,
+        recent.session_id,
+        recent.status,
     )
-    _write_github_output("comment_handled", "resumed")
-    _write_github_output("session_id", new_session.session_id)
-    _write_github_output("session_url", new_session.url)
+    _write_github_output("comment_handled", "forwarded")
 
 
 def _parse_labels(labels_str: str) -> set[str]:
