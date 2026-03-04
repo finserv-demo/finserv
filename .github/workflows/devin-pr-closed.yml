@@ -1,0 +1,105 @@
+name: Handle Devin PR Closed Without Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  revert-issue-to-triaged:
+    # Only act when PR was closed WITHOUT merging
+    if: github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract issue number from PR body
+        id: extract
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Look for cross-repo issue URL in PR body:
+          # https://github.com/finserv-demo/devin-issue-tackler/issues/N
+          issue_number=$(echo "$PR_BODY" | grep -oP 'finserv-demo/devin-issue-tackler/issues/\K\d+' | head -1)
+
+          if [ -z "$issue_number" ]; then
+            echo "No devin-issue-tackler issue reference found in PR body, skipping"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Check issue has devin:pr-opened label
+        if: steps.extract.outputs.found == 'true'
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.ISSUES_REPO_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+        run: |
+          REPO="finserv-demo/devin-issue-tackler"
+
+          labels=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
+            --json labels -q '.labels[].name' 2>/dev/null || true)
+
+          if echo "$labels" | grep -q "^devin:pr-opened$"; then
+            echo "has_label=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Issue #$ISSUE_NUMBER does not have devin:pr-opened label, skipping"
+            echo "has_label=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Transition issue back to triaged
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ISSUES_REPO_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          REPO="finserv-demo/devin-issue-tackler"
+
+          # Swap labels: devin:pr-opened → devin:triaged
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+            --remove-label "devin:pr-opened" \
+            --add-label "devin:triaged"
+
+          # Post comment explaining what happened
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+            --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can retry implementation with \`/proceed\` or retriage with \`/retriage\`."
+
+      - name: Terminate active Devin session
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
+        env:
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+        run: |
+          # Find active sessions for this issue via Devin API
+          response=$(curl -sf -H "Authorization: Bearer $DEVIN_API_KEY" \
+            "https://api.devin.ai/v1/sessions?tags=backlog-auto,issue:${ISSUE_NUMBER}&limit=10" \
+            2>/dev/null || echo '{"sessions":[]}')
+
+          # Extract active session IDs (status: working/running/new/claimed/resuming)
+          session_ids=$(echo "$response" | jq -r '
+            .sessions[]
+            | select(
+                .status_enum == "working" or
+                .status_enum == "blocked" or
+                .status == "running" or
+                .status == "new" or
+                .status == "claimed" or
+                .status == "resuming"
+              )
+            | .session_id
+          ' 2>/dev/null || true)
+
+          if [ -z "$session_ids" ]; then
+            echo "No active Devin sessions found for issue #$ISSUE_NUMBER"
+            exit 0
+          fi
+
+          # Terminate each active session
+          for sid in $session_ids; do
+            echo "Terminating session $sid..."
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer $DEVIN_API_KEY" \
+              "https://api.devin.ai/v1/sessions/${sid}" 2>/dev/null || true
+          done
