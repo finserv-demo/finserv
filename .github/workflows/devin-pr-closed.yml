@@ -77,7 +77,7 @@ jobs:
             --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can retry implementation with \`/proceed\` or retriage with \`/retriage\`."
 
       - name: Terminate active Devin session
-        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
+        if: always() && steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
