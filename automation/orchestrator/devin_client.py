@@ -153,8 +153,9 @@ class DevinClient:
     async def list_sessions_by_tags(self, tags: list[str]) -> list[DevinSession]:
         """List sessions filtered by tags.
 
-        Uses the v1 API's server-side tag filtering via the ?tags= parameter.
-        Multiple tags are comma-separated and all must match (AND logic).
+        Uses the v1 API's server-side tag filtering via repeated ?tags= query
+        parameters (e.g. ``?tags=backlog-auto&tags=issue:70``).  All tags must
+        match (AND logic).
 
         Args:
             tags: List of tags to filter by (all must match).
@@ -162,10 +163,9 @@ class DevinClient:
         Returns:
             List of matching sessions.
         """
-        params: dict[str, str | int] = {
-            "tags": ",".join(tags),
-            "limit": 100,
-        }
+        params: list[tuple[str, str | int]] = [("limit", 100)]
+        for tag in tags:
+            params.append(("tags", tag))
 
         resp = await self._request(
             "GET",

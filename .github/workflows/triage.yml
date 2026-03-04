@@ -116,7 +116,8 @@ jobs:
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
           # Check for any active session (status: running, new, claimed, resuming, suspended)
@@ -227,7 +228,8 @@ jobs:
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
           active_url=$(echo "$response" | jq -r '
@@ -384,7 +386,8 @@ jobs:
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
           session_id=$(echo "$response" | jq -r '
