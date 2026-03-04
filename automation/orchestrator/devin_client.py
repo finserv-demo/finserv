@@ -197,6 +197,21 @@ class DevinClient:
                 return session
         return None
 
+    async def get_most_recent_session_for_issue(self, issue_number: int) -> DevinSession | None:
+        """Get the most recently created session for an issue, regardless of status.
+
+        Used by the forward-comment flow to attempt messaging an existing
+        session before giving up.  Unlike ``get_active_session_for_issue``
+        this does **not** filter by status — even sessions that have
+        transiently exited may accept a message (which auto-resumes them).
+
+        Returns ``None`` only when zero sessions exist for this issue.
+        """
+        sessions = await self.get_sessions_for_issue(issue_number)
+        if not sessions:
+            return None
+        return max(sessions, key=lambda s: s.created_at if isinstance(s.created_at, str) else "")
+
     # ── Message polling ──
 
     async def list_messages(
