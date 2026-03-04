@@ -1,13 +1,16 @@
 """Tests for portfolio routes."""
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from fastapi.testclient import TestClient
+
+from services.portfolio.db import _holdings, _portfolios, _transactions, init_db
 from services.portfolio.main import app
-from services.portfolio.db import init_db, _portfolios, _holdings, _transactions
 
 
 @pytest.fixture(autouse=True)

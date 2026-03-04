@@ -1,30 +1,27 @@
 """FastAPI routes for the portfolio service."""
 
-from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from services.portfolio.db import (
-    get_portfolio,
-    get_portfolios_for_user,
-    get_holdings_for_portfolio,
-    get_transactions_for_portfolio,
-    get_all_transactions_for_portfolio,
-)
 from services.portfolio.calculator import (
-    calculate_portfolio_value,
     calculate_portfolio_drift,
-    generate_rebalance_trades,
+    calculate_portfolio_value,
     execute_rebalance,
+    generate_rebalance_trades,
     get_portfolio_summary,
 )
+from services.portfolio.db import (
+    get_all_transactions_for_portfolio,
+    get_holdings_for_portfolio,
+    get_portfolio,
+    get_portfolios_for_user,
+    get_transactions_for_portfolio,
+)
 from services.portfolio.errors import (
-    PortfolioNotFoundError,
     InvalidAllocationError,
+    PortfolioNotFoundError,
     RebalanceError,
-    InsufficientFundsError,
 )
 
 router = APIRouter()

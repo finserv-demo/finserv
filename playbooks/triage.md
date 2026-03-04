@@ -17,14 +17,12 @@ or decides not to proceed.
 The full GitHub issue (title, body, labels, URL) is in your prompt context. You must have
 access to the finserv-demo/finserv codebase.
 
-## Immediate Response Phase (CRITICAL — DO NOT SKIP)
+## Immediate Response Phase
+Do these three things FIRST, before any analysis. Speed matters — the user should see
+activity within seconds of the issue being opened.
 
-It is absolutely imperative that you do the following three steps, in order, before
-doing anything else. These are not optional. These are not suggestions. You must
-complete all three:
-
-1. **Add an eyes reaction** (👀) to the issue.
-2. **Add the `devin:triage` label** to the issue.
+1. **Add the `devin:triage` label** to the issue.
+2. **Add an eyes reaction** (👀) to the issue.
 3. **Post a welcome comment** on the issue:
 
    ```
@@ -34,12 +32,7 @@ complete all three:
    Feel free to add context at any time. When you're ready to build, just say the word.
    ```
 
-If you do not do ALL THREE of these things you will have failed in your duties. The
-reaction and the label are critical to the lifecycle management of this issue — if you
-do not add them you will break the issue management system. Do not rationalize skipping
-them. Do not move on to context gathering until all three are done.
-
-Only after all three are confirmed done, move to Context Gathering.
+Only after all three are done, move to Context Gathering.
 
 ## Context Gathering Phase
 Think about the full scope. Issues are sometimes sparse. Make sure you understand the
@@ -107,18 +100,10 @@ a bug.
    If anything needs adjusting, just comment and I'll update the plan.
    ```
 
-4. **Add the appropriate sizing label to the issue (MANDATORY — do not skip):**
-   - `devin:green` for Small
-   - `devin:yellow` for Medium
-   - `devin:red` for Large
+4. Add the appropriate sizing label to the issue:
+   - `devin:green`, `devin:yellow`, or `devin:red`
 
-   You must add exactly one of these labels. This is not optional.
-
-5. **Swap the status labels (MANDATORY — do not skip):**
-   Remove the `devin:triage` label and add the `devin:triaged` label.
-
-   This label swap is how the system tracks issue state. If you skip it, the issue
-   will be stuck in the wrong state and the pipeline will break.
+5. Remove the `devin:triage` label and add the `devin:triaged` label.
 
 ## Conversation Phase
 After posting your analysis, **stay in the session** and monitor the issue for new

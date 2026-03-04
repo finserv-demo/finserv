@@ -1,17 +1,18 @@
 """FastAPI routes for the notifications service."""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from typing import Optional
 
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from services.notifications.triggers import (
-    get_notifications_for_user,
-    mark_as_read,
-    get_alert_config,
-    update_alert_config,
     check_portfolio_drift_trigger,
     check_price_change_trigger,
+    get_alert_config,
+    get_notifications_for_user,
     init_notification_data,
+    mark_as_read,
+    update_alert_config,
 )
 
 router = APIRouter()
