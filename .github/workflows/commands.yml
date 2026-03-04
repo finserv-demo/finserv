@@ -1,4 +1,4 @@
-name: Slash Commands
+name: Issue Comments
 
 on:
   issue_comment:
@@ -32,137 +32,6 @@ jobs:
           else
             echo "is_command=false" >> "$GITHUB_OUTPUT"
             echo "command=" >> "$GITHUB_OUTPUT"
-          fi
-
-      # ── /proceed or /sgtm: swap devin:triaged → devin:implement + create session ──
-      - name: Handle /proceed
-        if: steps.parse.outputs.command == '/proceed' || steps.parse.outputs.command == '/sgtm'
-        id: proceed
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
-          IMPLEMENT_PLAYBOOK_ID: ${{ vars.IMPLEMENT_PLAYBOOK_ID }}
-          ACU_LIMIT_IMPLEMENT: ${{ vars.ACU_LIMIT_IMPLEMENT }}
-        run: |
-          issue=${{ github.event.issue.number }}
-          repo=${{ github.repository }}
-
-          labels=$(gh issue view "${issue}" \
-            --repo "${repo}" \
-            --json labels -q '.labels[].name')
-
-          if echo "$labels" | grep -q "^devin:triaged$"; then
-            # Check if a session (e.g. triage) is still active
-            response=$(curl -s \
-              -X GET "https://api.devin.ai/v1/sessions" \
-              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-              -G --data-urlencode "tags=backlog-auto,issue:${issue}" \
-              --data-urlencode "limit=100")
-
-            active_id=$(echo "$response" | jq -r '
-              [.sessions[] | select(.status as $s |
-                ["running","new","claimed","resuming"] | index($s))] |
-              first | .session_id // empty')
-
-            if [ -n "$active_id" ]; then
-              # Triage still running — tell Devin to proceed to implement
-              msg="The user has approved implementation. When you finish triaging, swap the label to devin:implement (instead of devin:triaged) so implementation starts automatically."
-              curl -s -X POST "https://api.devin.ai/v1/sessions/${active_id}/message" \
-                -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -n --arg m "$msg" '{message: $m}')"
-              gh issue comment "${issue}" \
-                --repo "${repo}" \
-                --body "Noted — triage is still in progress. Implementation will start automatically once triage completes."
-              exit 0
-            fi
-
-            # No active session — proceed immediately
-            # Swap labels
-            gh issue edit "${issue}" \
-              --repo "${repo}" \
-              --remove-label "devin:triaged" \
-              --add-label "devin:implement"
-
-            # Set up rollback trap — if anything below crashes under set -e,
-            # restore labels and notify the user.
-            trap 'gh issue edit "${issue}" --repo "${repo}" --remove-label "devin:implement" --add-label "devin:triaged" 2>/dev/null || true; gh issue comment "${issue}" --repo "${repo}" --body "Failed to create implement session (unexpected error). Labels restored. Retry with \`/proceed\`."' ERR
-
-            # Add eyes reaction
-            gh api "repos/${repo}/issues/${issue}/reactions" \
-              -f content=eyes --silent || true
-
-            # Fetch context and create implement session
-            context=$(gh issue view "${issue}" \
-              --repo "${repo}" \
-              --json title,body,labels,comments)
-
-            title=$(echo "$context" | jq -r '.title // ""' | head -c 500)
-            body=$(echo "$context" | jq -r '.body // ""' | head -c 5000)
-            issue_labels=$(echo "$context" | jq -r '[.labels[].name] | join(", ")')
-            comments=$(echo "$context" | jq -r '
-              .comments[] |
-              "### Comment by @\(.author.login)\n\(.body)\n"' 2>/dev/null || echo "")
-
-            prompt="Implement a fix for GitHub issue #${issue} on ${repo}.
-
-            ## Issue #${issue}: ${title}
-
-            ${body}
-
-            **Labels:** ${issue_labels}
-            **Repository:** ${repo}
-            **Issue URL:** https://github.com/${repo}/issues/${issue}"
-
-            if [ -n "$comments" ]; then
-              prompt="${prompt}
-
-            ## Comments (includes triage analysis and human feedback)
-            ${comments}"
-            fi
-
-            payload=$(jq -n \
-              --arg prompt "$prompt" \
-              --arg playbook_id "${IMPLEMENT_PLAYBOOK_ID:-}" \
-              --argjson max_acu "${ACU_LIMIT_IMPLEMENT:-50}" \
-              --arg tag1 "backlog-auto" \
-              --arg tag2 "issue:${issue}" \
-              --arg tag3 "stage:implement" \
-              --arg tag4 "repo:${repo}" \
-              '{
-                prompt: $prompt,
-                tags: [$tag1, $tag2, $tag3, $tag4],
-                max_acu_limit: $max_acu
-              } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
-
-            response=$(curl -s -w "\n%{http_code}" \
-              -X POST "https://api.devin.ai/v1/sessions" \
-              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload")
-
-            http_code=$(echo "$response" | tail -1)
-            resp_body=$(echo "$response" | sed '$d')
-
-            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-              echo "Session created successfully"
-            else
-              # Rollback: restore devin:triaged, remove devin:implement
-              trap - ERR
-              gh issue edit "${issue}" \
-                --repo "${repo}" \
-                --remove-label "devin:implement" \
-                --add-label "devin:triaged" 2>/dev/null || true
-              gh issue comment "${issue}" \
-                --repo "${repo}" \
-                --body "Failed to create Devin implement session: HTTP ${http_code}. Labels have been restored. You can retry with \`/proceed\`."
-            fi
-
-            trap - ERR
-          else
-            gh issue comment "${issue}" \
-              --repo "${repo}" \
-              --body "Cannot proceed — issue is not in \`devin:triaged\` state."
           fi
 
       # ── /triage: create session (if no devin label present) ──
@@ -219,7 +88,7 @@ jobs:
             payload=$(jq -n \
               --arg prompt "$prompt" \
               --arg playbook_id "${TRIAGE_PLAYBOOK_ID:-}" \
-              --argjson max_acu "${ACU_LIMIT_TRIAGE:-8}" \
+              --argjson max_acu "${ACU_LIMIT_TRIAGE:-25}" \
               --arg tag1 "backlog-auto" \
               --arg tag2 "issue:${issue}" \
               --arg tag3 "stage:triage" \
@@ -254,9 +123,7 @@ jobs:
       - name: Forward comment to Devin session
         if: >-
           steps.parse.outputs.is_command != 'true' ||
-          (steps.parse.outputs.command != '/proceed' &&
-           steps.parse.outputs.command != '/sgtm' &&
-           steps.parse.outputs.command != '/triage')
+          steps.parse.outputs.command != '/triage'
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           COMMENT_BODY: ${{ github.event.comment.body }}

@@ -11,8 +11,9 @@ concurrency:
 
 jobs:
   # ── New issue opened: create Devin triage session ──
-  # The triage playbook itself handles adding the devin:triage label,
-  # eyes reaction, and welcome comment — so Devin is the visible actor.
+  # The triage playbook handles labels, reactions, welcome comment, analysis,
+  # user conversation, and the handoff to implementation (by adding
+  # devin:implement when the user approves). GHA just creates the session.
   auto-triage-on-open:
     if: >-
       github.event.action == 'opened' &&
@@ -51,7 +52,7 @@ jobs:
           payload=$(jq -n \
             --arg prompt "$prompt" \
             --arg playbook_id "${TRIAGE_PLAYBOOK_ID:-}" \
-            --argjson max_acu "${ACU_LIMIT_TRIAGE:-8}" \
+            --argjson max_acu "${ACU_LIMIT_TRIAGE:-25}" \
             --arg tag1 "backlog-auto" \
             --arg tag2 "issue:${issue}" \
             --arg tag3 "stage:triage" \
@@ -166,7 +167,7 @@ jobs:
           payload=$(jq -n \
             --arg prompt "$prompt" \
             --arg playbook_id "${TRIAGE_PLAYBOOK_ID:-}" \
-            --argjson max_acu "${ACU_LIMIT_TRIAGE:-8}" \
+            --argjson max_acu "${ACU_LIMIT_TRIAGE:-25}" \
             --arg tag1 "backlog-auto" \
             --arg tag2 "issue:${issue}" \
             --arg tag3 "stage:triage" \
