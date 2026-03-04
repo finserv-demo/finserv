@@ -47,7 +47,7 @@ jobs:
 
           # Find the linked issue number from the PR body (looks for "Closes #N" or "Fixes #N")
           pr_body=$(gh pr view "$pr_number" --repo "${{ github.repository }}" --json body -q '.body' 2>/dev/null || echo "")
-          issue_number=$(echo "$pr_body" | grep -oiP '(?:closes|fixes|resolves)\s+#\K\d+' | head -1 || true)
+          issue_number=$(echo "$pr_body" | grep -oiP '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\K\d+' | head -1 || true)
 
           if [ -z "$issue_number" ]; then
             echo "No linked issue found in PR #${pr_number}"
