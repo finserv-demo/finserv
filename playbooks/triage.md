@@ -17,13 +17,41 @@ or decides not to proceed.
 The full GitHub issue (title, body, labels, URL) is in your prompt context. You must have
 access to the finserv-demo/finserv codebase.
 
+## GitHub CLI Usage (CRITICAL)
+
+You MUST use the `gh` CLI for ALL GitHub interactions — adding/removing labels,
+posting comments, adding reactions, viewing issues. Do NOT use `curl` with
+`$GITHUB_TOKEN` — that token only has read access and writes will fail silently
+or error out.
+
+Examples:
+```bash
+# Add a label
+gh issue edit 82 --repo finserv-demo/finserv --add-label "devin:triage"
+
+# Remove a label
+gh issue edit 82 --repo finserv-demo/finserv --remove-label "devin:triage"
+
+# Swap labels (remove old, add new)
+gh issue edit 82 --repo finserv-demo/finserv --remove-label "devin:triage" --add-label "devin:triaged"
+
+# Add a reaction
+gh api repos/finserv-demo/finserv/issues/82/reactions -f content=eyes --silent
+
+# Post a comment
+gh issue comment 82 --repo finserv-demo/finserv --body "Your comment here"
+```
+
+If a `gh` command fails, retry once. Do NOT fall back to `curl` — it will not work
+for write operations.
+
 ## Immediate Response Phase
 Do these three things FIRST, before any analysis. Speed matters — the user should see
 activity within seconds of the issue being opened.
 
-1. **Add the `devin:triage` label** to the issue.
-2. **Add an eyes reaction** (👀) to the issue.
-3. **Post a welcome comment** on the issue:
+1. **Add the `devin:triage` label** to the issue (use `gh issue edit`).
+2. **Add an eyes reaction** (👀) to the issue (use `gh api`).
+3. **Post a welcome comment** on the issue (use `gh issue comment`):
 
    ```
    I'm looking into this — I'll post a triage summary shortly with scope, affected
@@ -100,10 +128,10 @@ a bug.
    If anything needs adjusting, just comment and I'll update the plan.
    ```
 
-4. Add the appropriate sizing label to the issue:
+4. Add the appropriate sizing label to the issue (use `gh issue edit --add-label`):
    - `devin:green`, `devin:yellow`, or `devin:red`
 
-5. Remove the `devin:triage` label and add the `devin:triaged` label.
+5. Swap status labels (use `gh issue edit --remove-label "devin:triage" --add-label "devin:triaged"`).
 
 ## Conversation Phase
 After posting your analysis, **stay in the session** and monitor the issue for new
@@ -132,10 +160,10 @@ build decision.
 ## Handoff Phase
 When the user approves implementation:
 
-1. Post a short confirmation comment: e.g. "Starting implementation now."
-2. Remove the `devin:triaged` label and add the `devin:implement` label. This triggers
-   the implement workflow automatically — you do NOT need to create the implement session
-   yourself.
+1. Post a short confirmation comment (use `gh issue comment`).
+2. Swap labels (use `gh issue edit --remove-label "devin:triaged" --add-label "devin:implement"`).
+   This triggers the implement workflow automatically — you do NOT need to create the
+   implement session yourself.
 3. Your session is done.
 
 ## Specifications

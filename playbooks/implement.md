@@ -15,6 +15,27 @@ workflow handle the review lifecycle after you.
 - All human comments and feedback
 - Access to the finserv-demo/finserv codebase
 
+## GitHub CLI Usage (CRITICAL)
+
+You MUST use the `gh` CLI for ALL GitHub interactions — adding/removing labels,
+posting comments, adding reactions, viewing issues/PRs. Do NOT use `curl` with
+`$GITHUB_TOKEN` — that token only has read access and writes will fail.
+
+Examples:
+```bash
+# Swap labels on an issue
+gh issue edit 82 --repo finserv-demo/finserv --remove-label "devin:implement" --add-label "devin:pr-in-progress"
+
+# Post a comment on an issue
+gh issue comment 82 --repo finserv-demo/finserv --body "PR opened: https://github.com/..."
+
+# Add a reaction
+gh api repos/finserv-demo/finserv/issues/82/reactions -f content=eyes --silent
+```
+
+If a `gh` command fails, retry once. Do NOT fall back to `curl` — it will not work
+for write operations.
+
 ## Disambiguation Phase
 Re-read everything. Make sure you understand the full scope before writing code.
 
@@ -63,18 +84,22 @@ Re-read everything. Make sure you understand the full scope before writing code.
    - Body: link to issue, summary of changes, testing done
    - Include `Closes #{issue_number}` in the PR body
 
-9. Post a comment on the issue with the PR link.
+9. Post a comment on the issue with the PR link (use `gh issue comment`).
 
 10. **CRITICAL — Label Transition (implement -> pr-in-progress):**
-    Immediately after creating the PR, you MUST swap the issue label:
+    Immediately after creating the PR, you MUST swap the issue label using `gh`:
 
-        `devin:implement` -> `devin:pr-in-progress`
+    ```bash
+    gh issue edit {issue_number} --repo finserv-demo/finserv \
+      --remove-label "devin:implement" --add-label "devin:pr-in-progress"
+    ```
 
     This is NOT optional. This is NOT a suggestion. You MUST perform this label
     swap as soon as the PR is created. Failure to do so will leave the issue
     stuck in the wrong state and break the dashboard. Do NOT skip this step.
     Do NOT use any other label. The ONLY valid transition here is:
     `devin:implement` -> `devin:pr-in-progress`.
+    Do NOT use `curl` for this — use `gh issue edit` as shown above.
 
 11. **Your session is done.** After the label swap, your work is complete.
     Do NOT wait for CI. Do NOT wait for reviews. Do NOT iterate.
@@ -99,9 +124,12 @@ Re-read everything. Make sure you understand the full scope before writing code.
 ## Escalation
 
 If you cannot complete the implementation (stuck on a bug, ambiguous requirements,
-failing tests you can't fix), swap the label to `devin:escalated`:
+failing tests you can't fix), swap the label to `devin:escalated` using `gh`:
 
-    `devin:implement` -> `devin:escalated`
+```bash
+gh issue edit {issue_number} --repo finserv-demo/finserv \
+  --remove-label "devin:implement" --add-label "devin:escalated"
+```
 
 Post a comment on the issue summarizing:
 - What's failing
