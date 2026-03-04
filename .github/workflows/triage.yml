@@ -28,6 +28,23 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Add eyes reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
+            -f content=eyes --silent || true
+
+      - name: Post welcome comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --body "I'm looking into this — I'll post a triage summary shortly with scope, affected services, and effort estimate.
+
+          Feel free to add context at any time. When you're ready to build, just say the word."
+
       - name: Create triage session
         id: session
         env:
@@ -37,8 +54,8 @@ jobs:
         run: |
           issue=${{ github.event.issue.number }}
           repo=${{ github.repository }}
-          title=$(jq -r '.issue.title // ""' "$GITHUB_EVENT_PATH" | head -c 500)
-          body=$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH" | head -c 5000)
+          title=$(jq -r '.issue.title // "" ' "$GITHUB_EVENT_PATH" | head -c 500)
+          body=$(jq -r '.issue.body // "" ' "$GITHUB_EVENT_PATH" | head -c 5000)
 
           prompt="Triage GitHub issue #${issue} on ${repo}.
 

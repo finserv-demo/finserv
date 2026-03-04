@@ -18,21 +18,14 @@ The full GitHub issue (title, body, labels, URL) is in your prompt context. You 
 access to the finserv-demo/finserv codebase.
 
 ## Immediate Response Phase
-Do these three things FIRST, before any analysis. Speed matters — the user should see
-activity within seconds of the issue being opened.
+The GitHub Actions workflow has already posted the eyes reaction and welcome comment
+on the issue before your session started. You do NOT need to duplicate these.
+
+Do this ONE thing FIRST, before any analysis:
 
 1. **Add the `devin:triage` label** to the issue.
-2. **Add an eyes reaction** (👀) to the issue.
-3. **Post a welcome comment** on the issue:
 
-   ```
-   I'm looking into this — I'll post a triage summary shortly with scope, affected
-   services, and effort estimate.
-
-   Feel free to add context at any time. When you're ready to build, just say the word.
-   ```
-
-Only after all three are done, move to Context Gathering.
+Then move to Context Gathering.
 
 ## Context Gathering Phase
 Think about the full scope. Issues are sometimes sparse. Make sure you understand the
