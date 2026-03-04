@@ -1,8 +1,5 @@
 /**
  * Dashboard component — shows portfolio overview stats.
- *
- * BUG: Uses formatCurrency() which shows '$' instead of '£'.
- * Should use formatGBP() instead.
  */
 
 import React, { useState, useEffect } from 'react'
@@ -77,7 +74,6 @@ function Dashboard() {
       <div className="stat-grid">
         <div className="stat-card">
           <div className="stat-label">Total Value</div>
-          {/* BUG: formatCurrency shows $ instead of £ */}
           <div className="stat-value">{formatCurrency(portfolio.total_value)}</div>
         </div>
         <div className="stat-card">
@@ -114,7 +110,6 @@ function Dashboard() {
                 <td style={{ fontWeight: 600 }}>{holding.symbol}</td>
                 <td>{holding.name}</td>
                 <td>{holding.quantity}</td>
-                {/* BUG: formatCurrency shows $ */}
                 <td>{formatCurrency(holding.current_price)}</td>
                 <td>{formatCurrency(holding.value)}</td>
                 <td className={holding.gain_loss >= 0 ? 'positive' : 'negative'}>
