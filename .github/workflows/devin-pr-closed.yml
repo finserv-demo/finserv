@@ -12,8 +12,12 @@ on:
 
 jobs:
   revert-issue-to-triaged:
-    # Only act when PR was closed WITHOUT merging
-    if: github.event.pull_request.merged == false
+    # Only act on Devin bot PRs closed WITHOUT merging.
+    # The author check prevents external contributors from triggering label
+    # transitions on devin-labeled issues by opening+closing arbitrary PRs.
+    if: >-
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.user.login == 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
     permissions:
       issues: write
