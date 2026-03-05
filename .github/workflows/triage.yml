@@ -218,8 +218,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Check for existing active session
-        id: check
+      - name: Terminate previous sessions for this issue
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
         run: |
@@ -232,37 +231,19 @@ jobs:
             --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
-          active_url=$(echo "$response" | jq -r '
+          # Terminate all active sessions (e.g. lingering triage sessions)
+          echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
               ["running","new","claimed","resuming","suspended"] | index($s))] |
-            first | .url // empty')
-
-          if [ -n "$active_url" ]; then
-            echo "has_active=true" >> "$GITHUB_OUTPUT"
-            echo "active_session_url=${active_url}" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_active=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip — active session already exists
-        if: steps.check.outputs.has_active == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue comment ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --body "Skipping implement — an active Devin session already exists."
-
-      - name: Add eyes reaction
-        if: steps.check.outputs.has_active != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions \
-            -f content=eyes --silent || true
+            .[].session_id' | while IFS= read -r session_id; do
+            if [ -n "$session_id" ]; then
+              echo "Terminating previous session ${session_id}..."
+              curl -s -X DELETE "https://api.devin.ai/v1/sessions/${session_id}" \
+                -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
+            fi
+          done
 
       - name: Create implement session
-        if: steps.check.outputs.has_active != 'true'
         id: session
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
@@ -344,7 +325,7 @@ jobs:
           done
 
       - name: Revert to triaged — session creation failed
-        if: always() && steps.check.outputs.has_active != 'true' && steps.session.outputs.session_created != 'true'
+        if: always() && steps.session.outputs.session_created != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
