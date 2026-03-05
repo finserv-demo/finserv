@@ -4,8 +4,7 @@ Handles UK-specific validations: NI numbers, postcodes, phone numbers.
 """
 
 import re
-from typing import Optional
-from datetime import date, datetime
+from datetime import date
 
 
 def validate_email(email: str) -> dict:

@@ -1,17 +1,19 @@
 """Tests for market data provider."""
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from services.market_data.provider import (
+    BASE_PRICES,
+    clear_cache,
+    get_available_symbols,
+    get_historical_prices,
     get_price,
     get_prices,
-    get_historical_prices,
-    get_available_symbols,
-    clear_cache,
-    BASE_PRICES,
 )
 
 

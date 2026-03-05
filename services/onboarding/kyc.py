@@ -10,7 +10,6 @@ from typing import Optional
 
 from services.onboarding.validators import validate_onboarding_data
 
-
 # In-memory store for applications
 _applications: dict = {}
 
