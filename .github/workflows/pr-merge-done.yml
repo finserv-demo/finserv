@@ -83,6 +83,7 @@ jobs:
 
       - name: Terminate active sessions for this issue
         if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_devin == 'true'
+        continue-on-error: true
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
         run: |
