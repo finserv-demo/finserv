@@ -414,7 +414,7 @@ jobs:
             fi
           done
 
-      - name: Remove devin labels
+      - name: Remove devin status labels (preserve sizing labels)
         if: steps.check.outputs.has_devin_labels == 'true' && steps.check.outputs.is_done != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -422,7 +422,12 @@ jobs:
           gh issue view ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --json labels -q '.labels[].name' | while IFS= read -r label; do
-            if [[ "$label" == devin:* ]]; then
+            # Remove devin status/control labels but preserve sizing labels
+            # (devin:small, devin:medium, devin:large) so metrics stay accurate
+            if [[ "$label" == devin:* ]] && \
+               [[ "$label" != "devin:small" ]] && \
+               [[ "$label" != "devin:medium" ]] && \
+               [[ "$label" != "devin:large" ]]; then
               gh issue edit ${{ github.event.issue.number }} \
                 --repo ${{ github.repository }} \
                 --remove-label "$label" 2>/dev/null || true
