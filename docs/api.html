@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinServ API Documentation</title>
+    <style>
+        :root {
+            --primary: #1a56db;
+            --primary-light: #e8effc;
+            --text: #1f2937;
+            --text-muted: #6b7280;
+            --bg: #f9fafb;
+            --card-bg: #ffffff;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            font-size: 0.95rem;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: var(--shadow);
+            transition: box-shadow 0.15s, border-color 0.15s;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(26, 86, 219, 0.12);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .card .port {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .card .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-bottom: 1rem;
+        }
+
+        .card .tag {
+            font-size: 0.75rem;
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .card .links {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .card .links a {
+            font-size: 0.85rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .card .links a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>FinServ API Documentation</h1>
+        <p>Unified gateway to all FinServ microservice APIs. Each service exposes its own Swagger UI and OpenAPI spec.</p>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Portfolio Service -->
+            <div class="card">
+                <h2>Portfolio Service</h2>
+                <div class="port">localhost:8000</div>
+                <p>Portfolio management, rebalancing, and holdings tracking.</p>
+                <div class="tags">
+                    <span class="tag">Holdings</span>
+                    <span class="tag">Transactions</span>
+                    <span class="tag">Rebalancing</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8000/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8000/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+
+            <!-- Tax Service -->
+            <div class="card">
+                <h2>Tax Service</h2>
+                <div class="port">localhost:8001</div>
+                <p>UK tax calculations: ISA allowance, CGT, bed-and-breakfasting, and tax-loss harvesting.</p>
+                <div class="tags">
+                    <span class="tag">ISA</span>
+                    <span class="tag">CGT</span>
+                    <span class="tag">Harvesting</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8001/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8001/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+
+            <!-- Risk Engine -->
+            <div class="card">
+                <h2>Risk Engine</h2>
+                <div class="port">localhost:8002</div>
+                <p>Risk profiling questionnaires, scoring, and recommended portfolio allocations.</p>
+                <div class="tags">
+                    <span class="tag">Questionnaire</span>
+                    <span class="tag">Profile</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8002/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8002/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+
+            <!-- Market Data -->
+            <div class="card">
+                <h2>Market Data Service</h2>
+                <div class="port">localhost:8003</div>
+                <p>Real-time and historical price feeds for LSE-listed securities.</p>
+                <div class="tags">
+                    <span class="tag">Prices</span>
+                    <span class="tag">Symbols</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8003/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8003/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+
+            <!-- Onboarding -->
+            <div class="card">
+                <h2>Onboarding Service</h2>
+                <div class="port">localhost:8004</div>
+                <p>KYC onboarding, identity verification, and UK-specific field validation.</p>
+                <div class="tags">
+                    <span class="tag">Applications</span>
+                    <span class="tag">Verification</span>
+                    <span class="tag">Validation</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8004/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8004/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="card">
+                <h2>Notifications Service</h2>
+                <div class="port">localhost:8005</div>
+                <p>Email/SMS/push notification triggers and threshold-based alerts.</p>
+                <div class="tags">
+                    <span class="tag">Inbox</span>
+                    <span class="tag">Config</span>
+                    <span class="tag">Triggers</span>
+                </div>
+                <div class="links">
+                    <a href="http://localhost:8005/docs" target="_blank">Swagger UI</a>
+                    <a href="http://localhost:8005/openapi.json" target="_blank">OpenAPI JSON</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        FinServ API Documentation &mdash; Open any Swagger UI link above to explore the full endpoint reference.
+    </footer>
+</body>
+</html>

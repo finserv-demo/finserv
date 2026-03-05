@@ -10,10 +10,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from services.market_data.routes import router
 
+tags_metadata = [
+    {
+        "name": "Market Data - Prices",
+        "description": "Real-time and historical price feeds for LSE-listed securities.",
+    },
+    {
+        "name": "Market Data - Symbols",
+        "description": "Available symbols and instrument metadata.",
+    },
+    {
+        "name": "Health",
+        "description": "Service health checks.",
+    },
+]
+
 app = FastAPI(
     title="FinServ Market Data Service",
-    description="Market price feeds, caching, and retries",
+    description="Market price feeds, caching, and retries for LSE-listed securities. "
+    "Provides real-time quotes, historical OHLCV data, and symbol discovery.",
     version="0.1.0",
+    openapi_tags=tags_metadata,
 )
 
 app.add_middleware(
@@ -24,9 +41,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api/market-data", tags=["market-data"])
+app.include_router(router, prefix="/api/market-data")
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"], summary="Market data health check")
 async def health():
+    """Returns the health status of the market data service."""
     return {"status": "ok", "service": "market-data"}
