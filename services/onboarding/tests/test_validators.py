@@ -103,6 +103,27 @@ class TestDateOfBirthValidation:
         result = validate_date_of_birth(date(2020, 1, 1))
         assert result["valid"] is False
 
+    def test_exact_18th_birthday(self):
+        """User should be accepted on their exact 18th birthday."""
+        today = date.today()
+        dob = today.replace(year=today.year - 18)
+        result = validate_date_of_birth(dob)
+        assert result["valid"] is True
+        assert result["age"] == 18
+
+    def test_day_before_18th_birthday(self):
+        """User should be rejected the day before they turn 18."""
+        today = date.today()
+        # Construct a DOB that is 18 years ago tomorrow (so the user is still 17)
+        if today.day < 28:
+            dob = today.replace(year=today.year - 18, day=today.day + 1)
+        elif today.month < 12:
+            dob = today.replace(year=today.year - 18, month=today.month + 1, day=1)
+        else:
+            dob = today.replace(year=today.year - 17, month=1, day=1)
+        result = validate_date_of_birth(dob)
+        assert result["valid"] is False
+
     def test_very_old(self):
         result = validate_date_of_birth(date(1800, 1, 1))
         assert result["valid"] is False

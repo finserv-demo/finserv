@@ -115,8 +115,7 @@ def validate_date_of_birth(dob: date) -> dict:
 
     # Calculate age
     age = today.year - dob.year
-    # BUG: off-by-one in birthday check — uses > instead of >=
-    if (today.month, today.day) > (dob.month, dob.day):
+    if (today.month, today.day) >= (dob.month, dob.day):
         pass  # already past birthday this year
     else:
         age -= 1
