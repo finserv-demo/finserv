@@ -47,7 +47,7 @@ def identify_harvesting_opportunities(
                 "current_value": round(current_value, 2),
                 "cost_basis": round(cost_basis, 2),
                 "unrealised_loss": round(abs(unrealised_pnl), 2),
-                "loss_pct": round((unrealised_pnl / cost_basis) * 100, 2),
+                "loss_pct": round((unrealised_pnl / cost_basis) * 100, 2) if cost_basis != 0 else 0.0,
                 # BUG: doesn't check B&B rule — should flag if user bought
                 # this stock in the last 30 days
                 "bed_and_breakfast_risk": False,
