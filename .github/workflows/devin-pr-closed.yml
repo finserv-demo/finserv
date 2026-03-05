@@ -1,0 +1,109 @@
+name: Handle Devin PR Closed Without Merge
+
+on:
+  # Use pull_request_target instead of pull_request because PRs created by
+  # GitHub Apps (like devin-ai-integration[bot]) do not trigger pull_request
+  # events.  pull_request_target runs in the base-branch context and fires
+  # for bot-authored PRs.  This is safe here because we never checkout or
+  # execute code from the PR branch — we only read PR metadata via GraphQL
+  # and modify issues.
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  revert-issue-to-triaged:
+    # Only act on Devin bot PRs closed WITHOUT merging.
+    # The author check prevents external contributors from triggering label
+    # transitions on devin-labeled issues by opening+closing arbitrary PRs.
+    if: >-
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.user.login == 'devin-ai-integration[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Extract linked issue number
+        id: extract
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number=${{ github.event.pull_request.number }}
+          repo=${{ github.repository }}
+          owner="${repo%%/*}"
+          name="${repo##*/}"
+
+          # Use GraphQL closingIssuesReferences to get issues from the
+          # "Development" sidebar — the source of truth GitHub uses for
+          # auto-closing on merge.
+          issue_number=$(gh api graphql -f query='
+            query($owner: String!, $name: String!, $pr: Int!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  closingIssuesReferences(first: 1) {
+                    nodes { number }
+                  }
+                }
+              }
+            }' -f owner="$owner" -f name="$name" -F pr="$pr_number" \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[0].number // empty' 2>/dev/null || true)
+
+          if [ -z "$issue_number" ]; then
+            echo "No linked issue found in PR #${pr_number}, skipping"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Check issue has a devin PR label
+        if: steps.extract.outputs.found == 'true'
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
+
+          labels=$(gh issue view "$issue" --repo "$repo" \
+            --json labels -q '.labels[].name' 2>/dev/null || true)
+
+          # Check for either PR state label
+          pr_label=""
+          if echo "$labels" | grep -q "^devin:pr-in-progress$"; then
+            pr_label="devin:pr-in-progress"
+          elif echo "$labels" | grep -q "^devin:pr-ready$"; then
+            pr_label="devin:pr-ready"
+          fi
+
+          if [ -n "$pr_label" ]; then
+            echo "has_label=true" >> "$GITHUB_OUTPUT"
+            echo "pr_label=$pr_label" >> "$GITHUB_OUTPUT"
+          else
+            echo "Issue #${issue} does not have a devin PR label, skipping"
+            echo "has_label=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Transition issue back to triaged
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_label == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
+          pr_label="${{ steps.check.outputs.pr_label }}"
+
+          # Swap labels: current PR label → devin:triaged
+          gh issue edit "$issue" --repo "$repo" \
+            --remove-label "$pr_label" \
+            --add-label "devin:triaged"
+
+          # Post comment explaining what happened.
+          # Note: the Devin session is intentionally kept alive so users can
+          # re-engage via issue comments (commands.yml "message first, create
+          # never" policy at lines 124-132).
+          gh issue comment "$issue" --repo "$repo" \
+            --body "PR [${PR_TITLE}](${PR_URL}) was closed without merging. The issue has been moved back to \`devin:triaged\`. You can comment on this issue to guide the existing Devin session, or add the \`devin:implement\` label to start a fresh implementation attempt."
