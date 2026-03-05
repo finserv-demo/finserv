@@ -81,6 +81,31 @@ jobs:
           done
           echo "status_labels=${status_labels}" >> "$GITHUB_OUTPUT"
 
+      - name: Terminate active sessions for this issue
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_devin == 'true'
+        env:
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+        run: |
+          issue=${{ steps.extract.outputs.issue_number }}
+
+          response=$(curl -s \
+            -X GET "https://api.devin.ai/v1/sessions" \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
+            --data-urlencode "limit=100")
+
+          echo "$response" | jq -r '
+            [.sessions[] | select(.status as $s |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
+            .[].session_id' | while IFS= read -r session_id; do
+            if [ -n "$session_id" ]; then
+              echo "Terminating session ${session_id}..."
+              curl -s -X DELETE "https://api.devin.ai/v1/sessions/${session_id}" \
+                -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
+            fi
+          done
+
       - name: Transition issue to devin:done
         if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_devin == 'true'
         env:

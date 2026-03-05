@@ -357,14 +357,13 @@ jobs:
           echo "has_devin_labels=$has_devin" >> "$GITHUB_OUTPUT"
           echo "is_done=$is_done" >> "$GITHUB_OUTPUT"
 
-      - name: Terminate active session
+      - name: Terminate all active sessions
         if: steps.check.outputs.has_devin_labels == 'true' && steps.check.outputs.is_done != 'true'
         env:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
         run: |
           issue=${{ github.event.issue.number }}
 
-          # Find active session
           response=$(curl -s \
             -X GET "https://api.devin.ai/v1/sessions" \
             -H "Authorization: Bearer ${DEVIN_API_KEY}" \
@@ -372,18 +371,17 @@ jobs:
             --data-urlencode "tags=issue:${issue}" \
             --data-urlencode "limit=100")
 
-          session_id=$(echo "$response" | jq -r '
+          # Terminate ALL active sessions (not just the first)
+          echo "$response" | jq -r '
             [.sessions[] | select(.status as $s |
               ["running","new","claimed","resuming","suspended"] | index($s))] |
-            first | .session_id // empty')
-
-          if [ -n "$session_id" ]; then
-            curl -s -X DELETE "https://api.devin.ai/v1/sessions/${session_id}" \
-              -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
-            echo "Terminated session ${session_id}"
-          else
-            echo "No active session found for issue #${issue}"
-          fi
+            .[].session_id' | while IFS= read -r session_id; do
+            if [ -n "$session_id" ]; then
+              echo "Terminating session ${session_id}..."
+              curl -s -X DELETE "https://api.devin.ai/v1/sessions/${session_id}" \
+                -H "Authorization: Bearer ${DEVIN_API_KEY}" || true
+            fi
+          done
 
       - name: Remove devin labels
         if: steps.check.outputs.has_devin_labels == 'true' && steps.check.outputs.is_done != 'true'
