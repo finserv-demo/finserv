@@ -25,6 +25,7 @@ from services.portfolio.errors import (
     InvalidAllocationError,
     RebalanceError,
     InsufficientFundsError,
+    MarketDataUnavailableError,
 )
 
 router = APIRouter()
@@ -81,6 +82,8 @@ async def get_portfolio_value(portfolio_id: str):
         return calculate_portfolio_value(portfolio_id)
     except PortfolioNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except MarketDataUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @router.get("/portfolio/{portfolio_id}/drift")
@@ -189,6 +192,8 @@ async def portfolio_summary(portfolio_id: str):
         return summary
     except PortfolioNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except MarketDataUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 

@@ -9,10 +9,11 @@ from services.portfolio.db import init_db, _portfolios, _holdings
 from services.portfolio.calculator import (
     calculate_portfolio_value,
     calculate_portfolio_drift,
+    calculate_daily_pnl,
     generate_rebalance_trades,
     execute_rebalance,
 )
-from services.portfolio.errors import PortfolioNotFoundError
+from services.portfolio.errors import MarketDataUnavailableError, PortfolioNotFoundError
 
 
 @pytest.fixture(autouse=True)
@@ -47,6 +48,20 @@ class TestCalculatePortfolioValue:
     def test_portfolio_not_found(self):
         with pytest.raises(PortfolioNotFoundError):
             calculate_portfolio_value("nonexistent")
+
+    def test_missing_current_price_raises_error(self):
+        """If current_price is None, MarketDataUnavailableError should be raised."""
+        _holdings["h_001"]["current_price"] = None
+        with pytest.raises(MarketDataUnavailableError):
+            calculate_portfolio_value("pf_001")
+
+
+class TestCalculateDailyPnl:
+    def test_missing_current_price_raises_error(self):
+        """If current_price is None, MarketDataUnavailableError should be raised."""
+        _holdings["h_001"]["current_price"] = None
+        with pytest.raises(MarketDataUnavailableError):
+            calculate_daily_pnl("pf_001")
 
 
 class TestCalculatePortfolioDrift:

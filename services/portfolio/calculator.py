@@ -34,7 +34,8 @@ def calculate_portfolio_value(portfolio_id: str) -> dict:
     holdings_breakdown = []
 
     for holding in holdings:
-        # BUG: no null check on current_price — will crash if market data hasn't loaded
+        if holding.get("current_price") is None:
+            raise MarketDataUnavailableError(holding["symbol"])
         holding_value = holding["quantity"] * holding["current_price"]
         total_value += holding_value
 
@@ -278,6 +279,8 @@ def calculate_daily_pnl(portfolio_id: str) -> dict:
     holdings_pnl = []
 
     for holding in holdings:
+        if holding.get("current_price") is None:
+            raise MarketDataUnavailableError(holding["symbol"])
         # Simulate daily change — in reality we'd call market-data service
         # BUG: using hardcoded 0.5% daily change instead of real data
         daily_change_pct = 0.5
