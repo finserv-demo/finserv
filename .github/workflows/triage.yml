@@ -200,6 +200,15 @@ jobs:
             fi
           done
 
+      - name: Remove label — session creation failed
+        if: always() && steps.check.outputs.has_active != 'true' && steps.session.outputs.session_created != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --remove-label "devin:triage" 2>/dev/null || true
+
   # ── devin:implement label added (via UI, slash command, or triage handoff) ──
   start-implement-on-label:
     if: >-
