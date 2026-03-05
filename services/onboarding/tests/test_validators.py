@@ -106,7 +106,11 @@ class TestDateOfBirthValidation:
     def test_exact_18th_birthday(self):
         """User should be accepted on their exact 18th birthday."""
         today = date.today()
-        dob = today.replace(year=today.year - 18)
+        try:
+            dob = today.replace(year=today.year - 18)
+        except ValueError:
+            # Handles Feb 29 when year-18 is not a leap year
+            dob = today.replace(year=today.year - 18, day=today.day - 1)
         result = validate_date_of_birth(dob)
         assert result["valid"] is True
         assert result["age"] == 18
