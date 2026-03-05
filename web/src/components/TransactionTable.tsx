@@ -139,7 +139,6 @@ function TransactionTable() {
                     </span>
                   </td>
                   <td>{txn.quantity}</td>
-                  {/* BUG: formatCurrency shows $ instead of £ */}
                   <td>{formatCurrency(txn.price)}</td>
                   <td style={{ fontWeight: 500 }}>{formatCurrency(txn.total_amount)}</td>
                   <td>{txn.settled ? 'Settled' : 'Pending'}</td>

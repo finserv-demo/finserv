@@ -1,13 +1,13 @@
 from shared.types.models import (
-    User,
-    Portfolio,
     Holding,
-    Transaction,
-    RiskProfile,
     ISAAccount,
     MarketPrice,
     Notification,
     OnboardingApplication,
+    Portfolio,
+    RiskProfile,
+    Transaction,
+    User,
 )
 
 __all__ = [
