@@ -1,0 +1,111 @@
+name: Mark issue done on PR merge
+
+on:
+  # Use pull_request_target instead of pull_request because PRs created by
+  # GitHub Apps (like devin-ai-integration[bot]) do not trigger pull_request
+  # events.  pull_request_target runs in the base-branch context and fires
+  # for bot-authored PRs.  This is safe here because we never checkout or
+  # execute code from the PR branch — we only read PR metadata via GraphQL
+  # and modify issues.
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  mark-done:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Extract linked issue number
+        id: extract
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number=${{ github.event.pull_request.number }}
+          repo=${{ github.repository }}
+          owner="${repo%%/*}"
+          name="${repo##*/}"
+
+          # Use GraphQL closingIssuesReferences to get issues from the
+          # "Development" sidebar — the source of truth GitHub uses for
+          # auto-closing on merge.
+          issue_number=$(gh api graphql -f query='
+            query($owner: String!, $name: String!, $pr: Int!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr) {
+                  closingIssuesReferences(first: 1) {
+                    nodes { number }
+                  }
+                }
+              }
+            }' -f owner="$owner" -f name="$name" -F pr="$pr_number" \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[0].number // empty' 2>/dev/null || true)
+
+          if [ -z "$issue_number" ]; then
+            echo "No linked issue found for PR #${pr_number}, skipping"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Check issue has a devin label
+        if: steps.extract.outputs.found == 'true'
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
+
+          labels=$(gh issue view "$issue" --repo "$repo" \
+            --json labels -q '.labels[].name' 2>/dev/null || true)
+
+          if ! echo "$labels" | grep -q "^devin:"; then
+            echo "Issue #${issue} has no devin labels, skipping"
+            echo "has_devin=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_devin=true" >> "$GITHUB_OUTPUT"
+
+          # Collect current devin status labels to remove
+          status_labels=""
+          for status in triage triaged implement pr-in-progress pr-ready escalated; do
+            if echo "$labels" | grep -q "^devin:${status}$"; then
+              status_labels="${status_labels} devin:${status}"
+            fi
+          done
+          echo "status_labels=${status_labels}" >> "$GITHUB_OUTPUT"
+
+      - name: Transition issue to devin:done
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.has_devin == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issue=${{ steps.extract.outputs.issue_number }}
+          repo=${{ github.repository }}
+
+          # Remove old devin status labels
+          for label in ${{ steps.check.outputs.status_labels }}; do
+            gh issue edit "$issue" --repo "$repo" \
+              --remove-label "$label" 2>/dev/null || true
+            echo "Removed label ${label} from #${issue}"
+          done
+
+          # Add devin:done
+          gh issue edit "$issue" --repo "$repo" \
+            --add-label "devin:done"
+          echo "Added devin:done to #${issue}"
+
+          # Close the issue if still open (GitHub may auto-close via
+          # closingIssuesReferences, but we ensure it here)
+          state=$(gh issue view "$issue" --repo "$repo" \
+            --json state -q '.state' 2>/dev/null || echo "OPEN")
+          if [ "$state" = "OPEN" ]; then
+            gh issue close "$issue" --repo "$repo"
+            echo "Closed issue #${issue}"
+          fi
