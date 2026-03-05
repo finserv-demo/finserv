@@ -100,19 +100,40 @@ jobs:
                 max_acu_limit: $max_acu
               } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
 
-            response=$(curl -s -w "\n%{http_code}" \
-              -X POST "https://api.devin.ai/v1/sessions" \
-              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload")
+            # Retry loop with backoff for 429 (concurrent session limit)
+            max_retries=3
+            delays=(60 120 180)
+            total_attempts=$((max_retries + 1))
+            session_created=false
+            for attempt in $(seq 0 $max_retries); do
+              response=$(curl -s -w "\n%{http_code}" \
+                -X POST "https://api.devin.ai/v1/sessions" \
+                -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload")
 
-            http_code=$(echo "$response" | tail -1)
-            resp_body=$(echo "$response" | sed '$d')
+              http_code=$(echo "$response" | tail -1)
+              resp_body=$(echo "$response" | sed '$d')
 
-            if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+              if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                session_created=true
+                echo "Session created successfully"
+                break
+              elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
+                echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+                gh issue comment "${issue}" --repo "${repo}" \
+                  --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
+                sleep "${delays[$attempt]}"
+              else
+                echo "::error::Failed to create triage session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
+                break
+              fi
+            done
+
+            if [ "$session_created" != "true" ]; then
               gh issue comment "${issue}" \
                 --repo "${repo}" \
-                --body "Failed to create Devin triage session: HTTP ${http_code}. You can retry with \`/triage\`."
+                --body "Devin was unable to start a triage session after multiple retries (likely due to concurrent session limits). You can retry with \`/triage\`."
             fi
           else
             gh issue comment "${issue}" \

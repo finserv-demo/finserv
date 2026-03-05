@@ -35,6 +35,7 @@ jobs:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           TRIAGE_PLAYBOOK_ID: ${{ vars.TRIAGE_PLAYBOOK_ID }}
           ACU_LIMIT_TRIAGE: ${{ vars.ACU_LIMIT_TRIAGE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           issue=${{ github.event.issue.number }}
           repo=${{ github.repository }}
@@ -64,38 +65,44 @@ jobs:
               max_acu_limit: $max_acu
             } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
 
-          response=$(curl -s -w "\n%{http_code}" \
-            -X POST "https://api.devin.ai/v1/sessions" \
-            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$payload")
+          # Retry loop with backoff for 429 (concurrent session limit)
+          max_retries=3
+          delays=(60 120 180)
+          total_attempts=$((max_retries + 1))
+          for attempt in $(seq 0 $max_retries); do
+            response=$(curl -s -w "\n%{http_code}" \
+              -X POST "https://api.devin.ai/v1/sessions" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload")
 
-          http_code=$(echo "$response" | tail -1)
-          resp_body=$(echo "$response" | sed '$d')
+            http_code=$(echo "$response" | tail -1)
+            resp_body=$(echo "$response" | sed '$d')
 
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "session_created=true" >> "$GITHUB_OUTPUT"
-            echo "Session created successfully"
-          else
-            echo "session_created=false" >> "$GITHUB_OUTPUT"
-            echo "session_error<<EOF" >> "$GITHUB_OUTPUT"
-            echo "HTTP ${http_code}: ${resp_body}" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-            echo "::error::Failed to create triage session: HTTP ${http_code}"
-          fi
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "session_created=true" >> "$GITHUB_OUTPUT"
+              echo "Session created successfully"
+              break
+            elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
+              echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+              gh issue comment "${issue}" --repo "${repo}" \
+                --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
+              sleep "${delays[$attempt]}"
+            else
+              echo "session_created=false" >> "$GITHUB_OUTPUT"
+              echo "::error::Failed to create triage session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
+              break
+            fi
+          done
 
       - name: Notify — session creation failed
-        if: >-
-          always() &&
-          steps.session.outputs.session_created != 'true'
+        if: always() && steps.session.outputs.session_created == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SESSION_ERROR: ${{ steps.session.outputs.session_error }}
         run: |
-          error_detail="${SESSION_ERROR:-unknown error}"
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Failed to start Devin triage session: ${error_detail}. You can retry by adding the \`devin:triage\` label or commenting \`/triage\`."
+            --body "Devin was unable to start a triage session after multiple retries (likely due to concurrent session limits). You can retry by adding the \`devin:triage\` label or using \`/triage\`." 2>/dev/null || true
 
   # ── Manual devin:triage label added (via UI or /triage command) ──
   start-triage-on-label:
@@ -150,6 +157,7 @@ jobs:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           TRIAGE_PLAYBOOK_ID: ${{ vars.TRIAGE_PLAYBOOK_ID }}
           ACU_LIMIT_TRIAGE: ${{ vars.ACU_LIMIT_TRIAGE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           issue=${{ github.event.issue.number }}
           repo=${{ github.repository }}
@@ -179,36 +187,47 @@ jobs:
               max_acu_limit: $max_acu
             } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
 
-          response=$(curl -s -w "\n%{http_code}" \
-            -X POST "https://api.devin.ai/v1/sessions" \
-            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$payload")
+          # Retry loop with backoff for 429 (concurrent session limit)
+          max_retries=3
+          delays=(60 120 180)
+          total_attempts=$((max_retries + 1))
+          for attempt in $(seq 0 $max_retries); do
+            response=$(curl -s -w "\n%{http_code}" \
+              -X POST "https://api.devin.ai/v1/sessions" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload")
 
-          http_code=$(echo "$response" | tail -1)
-          resp_body=$(echo "$response" | sed '$d')
+            http_code=$(echo "$response" | tail -1)
+            resp_body=$(echo "$response" | sed '$d')
 
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "session_created=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "session_created=false" >> "$GITHUB_OUTPUT"
-            echo "session_error<<EOF" >> "$GITHUB_OUTPUT"
-            echo "HTTP ${http_code}: ${resp_body}" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "session_created=true" >> "$GITHUB_OUTPUT"
+              echo "Session created successfully"
+              break
+            elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
+              echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+              gh issue comment "${issue}" --repo "${repo}" \
+                --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
+              sleep "${delays[$attempt]}"
+            else
+              echo "session_created=false" >> "$GITHUB_OUTPUT"
+              echo "::error::Failed to create triage session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
+              break
+            fi
+          done
 
-      - name: Rollback — session creation failed
+      - name: Remove label and notify — session creation failed
         if: always() && steps.check.outputs.has_active != 'true' && steps.session.outputs.session_created != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SESSION_ERROR: ${{ steps.session.outputs.session_error }}
         run: |
           gh issue edit ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
             --remove-label "devin:triage" 2>/dev/null || true
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Failed to create Devin triage session: ${SESSION_ERROR}. The \`devin:triage\` label has been removed. You can retry by adding the label again or using \`/triage\`."
+            --body "Devin was unable to start a triage session after multiple retries (likely due to concurrent session limits). The \`devin:triage\` label has been removed — you can re-add it or use \`/triage\` to try again." 2>/dev/null || true
 
   # ── devin:implement label added (via UI, slash command, or triage handoff) ──
   start-implement-on-label:
@@ -298,36 +317,48 @@ jobs:
               max_acu_limit: $max_acu
             } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
 
-          response=$(curl -s -w "\n%{http_code}" \
-            -X POST "https://api.devin.ai/v1/sessions" \
-            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$payload")
+          # Retry loop with backoff for 429 (concurrent session limit)
+          max_retries=3
+          delays=(60 120 180)
+          total_attempts=$((max_retries + 1))
+          for attempt in $(seq 0 $max_retries); do
+            response=$(curl -s -w "\n%{http_code}" \
+              -X POST "https://api.devin.ai/v1/sessions" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload")
 
-          http_code=$(echo "$response" | tail -1)
-          resp_body=$(echo "$response" | sed '$d')
+            http_code=$(echo "$response" | tail -1)
+            resp_body=$(echo "$response" | sed '$d')
 
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "session_created=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "session_created=false" >> "$GITHUB_OUTPUT"
-            echo "session_error<<EOF" >> "$GITHUB_OUTPUT"
-            echo "HTTP ${http_code}: ${resp_body}" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "session_created=true" >> "$GITHUB_OUTPUT"
+              echo "Session created successfully"
+              break
+            elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
+              echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+              gh issue comment "${issue}" --repo "${repo}" \
+                --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
+              sleep "${delays[$attempt]}"
+            else
+              echo "session_created=false" >> "$GITHUB_OUTPUT"
+              echo "::error::Failed to create implement session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
+              break
+            fi
+          done
 
-      - name: Rollback — session creation failed
+      - name: Revert to triaged and notify — session creation failed
         if: always() && steps.session.outputs.session_created != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SESSION_ERROR: ${{ steps.session.outputs.session_error }}
         run: |
           gh issue edit ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --remove-label "devin:implement" 2>/dev/null || true
+            --remove-label "devin:implement" \
+            --add-label "devin:triaged" 2>/dev/null || true
           gh issue comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Failed to create Devin implement session: ${SESSION_ERROR}. The \`devin:implement\` label has been removed. You can retry by adding the label again or using \`/proceed\`."
+            --body "Devin was unable to start an implementation session after multiple retries (likely due to concurrent session limits). The issue has been moved back to \`devin:triaged\` — you can re-add \`devin:implement\` or use \`/proceed\` to try again." 2>/dev/null || true
 
   # ── Issue closed externally: terminate active session, clean up labels ──
   cleanup-on-close:
