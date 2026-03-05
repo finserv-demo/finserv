@@ -103,6 +103,7 @@ jobs:
             # Retry loop with backoff for 429 (concurrent session limit)
             max_retries=3
             delays=(60 120 180)
+            total_attempts=$((max_retries + 1))
             session_created=false
             for attempt in $(seq 0 $max_retries); do
               response=$(curl -s -w "\n%{http_code}" \
@@ -119,7 +120,9 @@ jobs:
                 echo "Session created successfully"
                 break
               elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
-                echo "::warning::Session creation returned 429 (attempt $((attempt+1))/$((max_retries+1))). Retrying in ${delays[$attempt]}s..."
+                echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+                gh issue comment "${issue}" --repo "${repo}" \
+                  --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
                 sleep "${delays[$attempt]}"
               else
                 echo "::error::Failed to create triage session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
@@ -130,7 +133,7 @@ jobs:
             if [ "$session_created" != "true" ]; then
               gh issue comment "${issue}" \
                 --repo "${repo}" \
-                --body "Failed to create Devin triage session after retries. You can retry with \`/triage\`."
+                --body "Devin was unable to start a triage session after multiple retries (likely due to concurrent session limits). You can retry with \`/triage\`."
             fi
           else
             gh issue comment "${issue}" \
