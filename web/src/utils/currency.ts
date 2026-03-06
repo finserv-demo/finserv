@@ -2,19 +2,13 @@
  * Currency formatting utilities for FinServ.
  *
  * All amounts should be in GBP (£) since this is a UK platform.
- *
- * BUG: Several functions use '$' instead of '£' — copy-pasted from
- * a US codebase template and never updated.
  */
 
 /**
  * Format a number as currency.
- *
- * BUG: Uses '$' symbol instead of '£'. Should use GBP formatting.
  */
 export function formatCurrency(amount: number): string {
-  // BUG: wrong currency symbol — should be £, not $
-  return `$${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  return `£${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
 }
 
 /**
@@ -38,18 +32,15 @@ export function formatPercentage(value: number, decimals: number = 2): string {
 
 /**
  * Format a large number compactly (e.g. £1.2M, £450K).
- *
- * BUG: Uses '$' prefix instead of '£'.
  */
 export function formatCompactCurrency(amount: number): string {
   if (amount >= 1_000_000) {
-    // BUG: wrong currency symbol
-    return `$${(amount / 1_000_000).toFixed(1)}M`
+    return `£${(amount / 1_000_000).toFixed(1)}M`
   }
   if (amount >= 1_000) {
-    return `$${(amount / 1_000).toFixed(1)}K`
+    return `£${(amount / 1_000).toFixed(1)}K`
   }
-  return `$${amount.toFixed(2)}`
+  return `£${amount.toFixed(2)}`
 }
 
 /**

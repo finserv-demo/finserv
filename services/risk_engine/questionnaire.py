@@ -4,8 +4,6 @@ The questionnaire follows FCA guidelines for assessing client risk tolerance
 and investment experience.
 """
 
-from datetime import datetime
-from typing import Optional
 
 
 # Risk questionnaire definition
@@ -78,7 +76,11 @@ RISK_QUESTIONNAIRE = {
                 {"value": "a", "label": "I can't afford to lose any money", "score": 1},
                 {"value": "b", "label": "I'm willing to accept small losses for better returns", "score": 2},
                 {"value": "c", "label": "I understand investments can go down as well as up", "score": 3},
-                {"value": "d", "label": "I'm comfortable with significant short-term losses for long-term gains", "score": 4},
+                {
+                    "value": "d",
+                    "label": "I'm comfortable with significant short-term losses for long-term gains",
+                    "score": 4,
+                },
             ],
         },
         {

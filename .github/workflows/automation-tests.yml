@@ -1,0 +1,29 @@
+name: Automation Tests
+
+on:
+  push:
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-tests.yml'
+  pull_request:
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx pydantic pytest pytest-asyncio pytest-httpx
+
+      - name: Run automation tests
+        run: pytest automation/tests/ -v
+        env:
+          PYTHONPATH: .

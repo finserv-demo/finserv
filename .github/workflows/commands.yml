@@ -1,0 +1,228 @@
+name: Issue Comments
+
+on:
+  issue_comment:
+    types: [created]
+
+# Prevent concurrent runs for the same issue
+concurrency:
+  group: issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  process-comment:
+    # Only run on issue comments (not PR comments), ignore bot comments
+    if: >-
+      !github.event.issue.pull_request &&
+      github.event.comment.user.login != 'github-actions[bot]' &&
+      github.event.comment.user.login != 'devin-ai-integration[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          command=$(echo "$COMMENT_BODY" | head -1 | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+          if [[ "$command" == /* ]]; then
+            echo "is_command=true" >> "$GITHUB_OUTPUT"
+            echo "command=$command" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_command=false" >> "$GITHUB_OUTPUT"
+            echo "command=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── /triage: create session (if no devin label present) ──
+      - name: Handle /triage
+        if: steps.parse.outputs.command == '/triage'
+        id: triage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          TRIAGE_PLAYBOOK_ID: ${{ vars.TRIAGE_PLAYBOOK_ID }}
+          ACU_LIMIT_TRIAGE: ${{ vars.ACU_LIMIT_TRIAGE }}
+        run: |
+          issue=${{ github.event.issue.number }}
+          repo=${{ github.repository }}
+
+          # Guard against duplicate sessions if /triage is issued multiple times
+          # before the playbook has a chance to add the devin:triage label.
+          response=$(curl -s \
+            -X GET "https://api.devin.ai/v1/sessions" \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
+            --data-urlencode "limit=100")
+
+          active_id=$(echo "$response" | jq -r '
+            [.sessions[] | select(.status as $s |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
+            first | .session_id // empty')
+
+          if [ -n "$active_id" ]; then
+            gh issue comment "${issue}" \
+              --repo "${repo}" \
+              --body "Triage is already in progress for this issue."
+            exit 0
+          fi
+
+          labels=$(gh issue view "${issue}" \
+            --repo "${repo}" \
+            --json labels -q '.labels[].name')
+
+          has_devin=$(echo "$labels" | grep "^devin:" || true)
+          if [ -z "$has_devin" ]; then
+            title=$(jq -r '.issue.title // ""' "$GITHUB_EVENT_PATH" | head -c 500)
+            body=$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH" | head -c 5000)
+
+            prompt="Triage GitHub issue #${issue} on ${repo}.
+
+            ## Issue #${issue}: ${title}
+
+            ${body}
+
+            **Repository:** ${repo}
+            **Issue URL:** https://github.com/${repo}/issues/${issue}"
+
+            payload=$(jq -n \
+              --arg prompt "$prompt" \
+              --arg playbook_id "${TRIAGE_PLAYBOOK_ID:-}" \
+              --argjson max_acu "${ACU_LIMIT_TRIAGE:-25}" \
+              --arg tag1 "backlog-auto" \
+              --arg tag2 "issue:${issue}" \
+              --arg tag3 "stage:triage" \
+              --arg tag4 "repo:${repo}" \
+              '{
+                prompt: $prompt,
+                tags: [$tag1, $tag2, $tag3, $tag4],
+                max_acu_limit: $max_acu
+              } + (if $playbook_id != "" then {playbook_id: $playbook_id} else {} end)')
+
+            # Retry loop with backoff for 429 (concurrent session limit)
+            max_retries=3
+            delays=(60 120 180)
+            total_attempts=$((max_retries + 1))
+            session_created=false
+            for attempt in $(seq 0 $max_retries); do
+              response=$(curl -s -w "\n%{http_code}" \
+                -X POST "https://api.devin.ai/v1/sessions" \
+                -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload")
+
+              http_code=$(echo "$response" | tail -1)
+              resp_body=$(echo "$response" | sed '$d')
+
+              if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                session_created=true
+                echo "Session created successfully"
+                break
+              elif [ "$http_code" -eq 429 ] && [ "$attempt" -lt "$max_retries" ]; then
+                echo "::warning::Session creation returned 429 (attempt $((attempt+1))/${total_attempts}). Retrying in ${delays[$attempt]}s..."
+                gh issue comment "${issue}" --repo "${repo}" \
+                  --body "Devin session creation hit concurrent session limits. Retrying in ${delays[$attempt]}s... (attempt $((attempt+1))/${total_attempts})" 2>/dev/null || true
+                sleep "${delays[$attempt]}"
+              else
+                echo "::error::Failed to create triage session: HTTP ${http_code} (after $((attempt+1)) attempt(s))"
+                break
+              fi
+            done
+
+            if [ "$session_created" != "true" ]; then
+              gh issue comment "${issue}" \
+                --repo "${repo}" \
+                --body "Devin was unable to start a triage session after multiple retries (likely due to concurrent session limits). You can retry with \`/triage\`."
+            fi
+          else
+            gh issue comment "${issue}" \
+              --repo "${repo}" \
+              --body "Cannot /triage — issue already has a devin label."
+          fi
+
+      # ── Non-command comment (or unrecognized slash command): forward to Devin session ──
+      # Strategy: "message first, create never"
+      # 1. Forward to an active session if one exists.
+      # 2. Otherwise, find the most recent session (any status) and try to
+      #    message it — POST /sessions/{id}/message auto-resumes suspended
+      #    sessions.
+      # 3. If messaging fails or no sessions exist, drop the comment with a
+      #    warning.  We never create new follow-up sessions from GHA to avoid
+      #    the duplicate-session race condition that caused double comments on
+      #    issues #70 and #73.
+      #
+      # NOTE: This logic is mirrored in automation/devin_api.py
+      # (cmd_forward_comment).  Keep both in sync when changing behavior.
+      - name: Forward comment to Devin session
+        if: >-
+          steps.parse.outputs.is_command != 'true' ||
+          steps.parse.outputs.command != '/triage'
+        env:
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          issue=${{ github.event.issue.number }}
+          repo=${{ github.repository }}
+          author="${{ github.event.comment.user.login }}"
+
+          echo "::group::Fetching sessions for issue #${issue}"
+          # Fetch all sessions for this issue (any status)
+          response=$(curl -s \
+            -X GET "https://api.devin.ai/v1/sessions" \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -G --data-urlencode "tags=backlog-auto" \
+            --data-urlencode "tags=issue:${issue}" \
+            --data-urlencode "limit=100")
+
+          total=$(echo "$response" | jq '[.sessions[]] | length')
+          echo "Found ${total} total session(s) for issue #${issue}"
+          echo "$response" | jq -r '.sessions[] | "  \(.session_id) | status=\(.status) | created=\(.created_at)"'
+          echo "::endgroup::"
+
+          # 1. Look for an active session
+          session_id=$(echo "$response" | jq -r '
+            [.sessions[] | select(.status as $s |
+              ["running","new","claimed","resuming","suspended"] | index($s))] |
+            first | .session_id // empty')
+
+          if [ -n "$session_id" ]; then
+            echo "Found active session: ${session_id}"
+          else
+            echo "No active session found for issue #${issue}"
+
+            # 2. Fall back to the most recent session (any status)
+            session_id=$(echo "$response" | jq -r '
+              [.sessions[]] | sort_by(.created_at) | last | .session_id // empty')
+
+            if [ -z "$session_id" ]; then
+              echo "::warning::No sessions exist for issue #${issue} — comment from @${author} not forwarded"
+              exit 0
+            fi
+
+            recent_status=$(echo "$response" | jq -r \
+              --arg sid "$session_id" \
+              '.sessions[] | select(.session_id == $sid) | .status')
+            echo "Falling back to most recent session: ${session_id} (status=${recent_status})"
+          fi
+
+          # 3. Attempt to forward the message
+          message="New comment from @${author} on GitHub issue #${issue}:
+
+          ${COMMENT_BODY}"
+
+          echo "::group::Sending message to session ${session_id}"
+          msg_response=$(curl -s -w "\n%{http_code}" \
+            -X POST "https://api.devin.ai/v1/sessions/${session_id}/message" \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg m "$message" '{message: $m}')")
+
+          http_code=$(echo "$msg_response" | tail -1)
+          echo "::endgroup::"
+
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "Forwarded comment from @${author} to session ${session_id}"
+          else
+            echo "::warning::Could not message session ${session_id} (HTTP ${http_code}) — comment from @${author} not forwarded"
+          fi
