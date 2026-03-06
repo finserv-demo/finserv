@@ -39,7 +39,7 @@ def calculate_portfolio_value(portfolio_id: str) -> dict:
 
         cost_basis = holding["quantity"] * holding["average_cost"]
         gain_loss = holding_value - cost_basis
-        gain_loss_pct = (gain_loss / cost_basis) * 100  # BUG: division by zero if cost_basis is 0
+        gain_loss_pct = (gain_loss / cost_basis) * 100 if cost_basis != 0 else 0.0
 
         holdings_breakdown.append({
             "symbol": holding["symbol"],

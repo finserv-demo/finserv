@@ -46,6 +46,26 @@ class TestCalculatePortfolioValue:
         expected_gain = (82.30 - 78.50) * 150.0
         assert vwrl["gain_loss"] == expected_gain
 
+    def test_zero_cost_basis_no_crash(self):
+        """Regression test for #12: ZeroDivisionError when cost_basis is 0."""
+        from services.portfolio.db import create_holding
+
+        create_holding({
+            "portfolio_id": "pf_001",
+            "symbol": "FREE.L",
+            "name": "Free Share Grant",
+            "quantity": 10.0,
+            "average_cost": 0.0,
+            "current_price": 5.00,
+            "currency": "GBP",
+        })
+
+        result = calculate_portfolio_value("pf_001")
+        free = next(h for h in result["holdings"] if h["symbol"] == "FREE.L")
+        assert free["gain_loss_pct"] == 0.0
+        assert free["value"] == 50.0
+        assert free["cost_basis"] == 0.0
+
     def test_portfolio_not_found(self):
         with pytest.raises(PortfolioNotFoundError):
             calculate_portfolio_value("nonexistent")
