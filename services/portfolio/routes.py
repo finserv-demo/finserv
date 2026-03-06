@@ -20,9 +20,9 @@ from services.portfolio.db import (
 )
 from services.portfolio.errors import (
     InvalidAllocationError,
+    MarketDataUnavailableError,
     PortfolioNotFoundError,
     RebalanceError,
-    MarketDataUnavailableError,
 )
 
 router = APIRouter()
